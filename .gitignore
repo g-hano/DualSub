@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+backend/.venv/
+backend/data/
+*.egg-info/
+.env
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Models / caches
+.cache/
+*.wav
+backend/Qwen3-*/
+backend/.tmp_pkg/
