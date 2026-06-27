@@ -14,7 +14,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from .config import ASR_MODELS, FORCED_ALIGNER_MODELS, LANGUAGE_NAMES, PipelineConfig, settings
+from .config import (
+    ASR_MODELS,
+    FORCED_ALIGNER_MODELS,
+    LANGUAGE_NAMES,
+    WHISPER_MODELS,
+    PipelineConfig,
+    settings,
+)
 from .jobs import manager
 from .logging_config import setup_logging, suppress_hf_progress_bars
 from .model_downloads import download_manager, repos_for_job
@@ -77,6 +84,8 @@ class EnsureJobModelsRequest(BaseModel):
     forced_aligner_model: str
     translator_backend: str
     qc_enabled: bool = False
+    asr_engine: str = "qwen"
+    whisper_model: str = "openai/whisper-large-v3"
 
 
 @app.post("/api/models/ensure-for-job")
@@ -88,6 +97,8 @@ def ensure_job_models(body: EnsureJobModelsRequest) -> dict:
         forced_aligner_model=body.forced_aligner_model,
         translator_backend=body.translator_backend,
         qc_enabled=body.qc_enabled,
+        asr_engine=body.asr_engine,
+        whisper_model=body.whisper_model,
     )
     result = download_manager.ensure_repos(repos)
     logger.info(
@@ -152,7 +163,11 @@ def languages() -> dict:
 
 @app.get("/api/asr-models")
 def asr_models() -> dict:
-    return {"asr_models": ASR_MODELS, "forced_aligner_models": FORCED_ALIGNER_MODELS}
+    return {
+        "asr_models": ASR_MODELS,
+        "forced_aligner_models": FORCED_ALIGNER_MODELS,
+        "whisper_models": WHISPER_MODELS,
+    }
 
 
 @app.post("/api/jobs")
@@ -160,9 +175,12 @@ async def create_job(
     source_url: Optional[str] = Form(None),
     source_lang: str = Form("sv"),
     target_lang: str = Form("en"),
+    asr_engine: str = Form("qwen"),
     asr_model: str = Form("Qwen/Qwen3-ASR-1.7B"),
     forced_aligner_model: str = Form("Qwen/Qwen3-ForcedAligner-0.6B"),
+    whisper_model: str = Form("openai/whisper-large-v3"),
     translator_backend: str = Form("helsinki"),
+    translate_batch_size: int = Form(16),
     qc_enabled: bool = Form(False),
     lmstudio_url: str = Form("http://localhost:1234/v1"),
     lmstudio_model: str = Form("local-model"),
@@ -172,20 +190,24 @@ async def create_job(
         raise HTTPException(400, "Provide either source_url or an uploaded file.")
 
     logger.info(
-        "Creating job: source_url=%s file=%s lang=%s->%s asr=%s",
+        "Creating job: source_url=%s file=%s lang=%s->%s engine=%s asr=%s",
         source_url or "(none)",
         file.filename if file else "(none)",
         source_lang,
         target_lang,
-        asr_model,
+        asr_engine,
+        whisper_model if asr_engine == "whisper" else asr_model,
     )
 
     config = PipelineConfig(
         source_lang=source_lang,
         target_lang=target_lang,
+        asr_engine=asr_engine,  # type: ignore[arg-type]
         asr_model=asr_model,
         forced_aligner_model=forced_aligner_model,
+        whisper_model=whisper_model,
         translator_backend=translator_backend,  # type: ignore[arg-type]
+        translate_batch_size=translate_batch_size,
         qc_enabled=qc_enabled,
         lmstudio_url=lmstudio_url,
         lmstudio_model=lmstudio_model,

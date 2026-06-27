@@ -46,14 +46,19 @@ export interface JobInfo {
   export_filename?: string | null;
 }
 
+export type AsrEngine = "qwen" | "whisper";
+
 export interface CreateJobParams {
   sourceUrl?: string;
   file?: File | null;
   sourceLang: string;
   targetLang: string;
+  asrEngine: AsrEngine;
   asrModel: string;
   forcedAlignerModel: string;
+  whisperModel: string;
   translatorBackend: string;
+  translateBatchSize: number;
   qcEnabled: boolean;
   lmstudioUrl: string;
   lmstudioModel: string;

@@ -148,6 +148,9 @@ def burn_in(media_path: Path, ass_path: Path, out_path: Path) -> Path:
         raise RuntimeError("ffmpeg not found on PATH.")
     # ffmpeg's subtitles filter needs an escaped path (esp. on Windows).
     ass_arg = str(ass_path).replace("\\", "/").replace(":", "\\:")
+    # Burning subtitles requires re-encoding the video. Use a high-quality x264
+    # encode (CRF 18 is visually near-lossless) and copy the audio untouched so
+    # the output quality stays as close to the source as possible.
     cmd = [
         ffmpeg,
         "-y",
@@ -155,8 +158,18 @@ def burn_in(media_path: Path, ass_path: Path, out_path: Path) -> Path:
         str(media_path),
         "-vf",
         f"subtitles='{ass_arg}'",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "slow",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
         "-c:a",
         "copy",
+        "-movflags",
+        "+faststart",
         str(out_path),
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)

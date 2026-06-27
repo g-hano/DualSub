@@ -69,8 +69,12 @@ def download_youtube(url: str, dest_dir: Path) -> Path:
     dest_dir.mkdir(parents=True, exist_ok=True)
     outtmpl = str(dest_dir / "source.%(ext)s")
     ydl_opts = {
-        # Flexible selector: prefer separate streams, fall back to any best format.
+        # Highest quality: best separate video+audio streams, fall back to best muxed.
         "format": "bestvideo*+bestaudio/best",
+        # Prefer highest resolution / fps / bitrate when several formats qualify.
+        "format_sort": ["res", "fps", "hdr:12", "vcodec", "br", "acodec"],
+        # mp4 keeps the in-browser preview player working; codecs are remuxed (no
+        # re-encode) when compatible.
         "merge_output_format": "mp4",
         "outtmpl": outtmpl,
         "quiet": True,

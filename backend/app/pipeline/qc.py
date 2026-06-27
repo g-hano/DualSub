@@ -166,7 +166,9 @@ def quality_check(
         return translations
 
     back_translator = get_translator(config.translator_backend)
-    back_translations = back_translator.translate(translations, tgt, src)
+    back_translations = back_translator.translate(
+        translations, tgt, src, batch_size=getattr(config, "translate_batch_size", 16)
+    )
 
     corrected = list(translations)
     batch_size = max(1, config.qc_batch_size)

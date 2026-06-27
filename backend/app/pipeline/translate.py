@@ -43,14 +43,20 @@ def translategemma_lang_code(iso: str) -> str:
     return TRANSLATEGEMMA_LANG_CODES.get(code, code)
 
 
+def _chunks(items: List[str], size: int):
+    size = max(1, size)
+    for i in range(0, len(items), size):
+        yield items[i : i + size]
+
+
 class Translator(ABC):
     @abstractmethod
-    def translate(self, texts: List[str], src: str, tgt: str) -> List[str]:
+    def translate(self, texts: List[str], src: str, tgt: str, batch_size: int = 16) -> List[str]:
         """Translate a batch of strings from src to tgt (ISO codes)."""
 
 
 class MockTranslator(Translator):
-    def translate(self, texts: List[str], src: str, tgt: str) -> List[str]:
+    def translate(self, texts: List[str], src: str, tgt: str, batch_size: int = 16) -> List[str]:
         return [f"[{src}->{tgt}] {t}" for t in texts]
 
 
@@ -76,11 +82,11 @@ class HelsinkiTranslator(Translator):
             self._pipes[key] = pipeline("translation", model=model, device=device)
             return self._pipes[key]
 
-    def translate(self, texts: List[str], src: str, tgt: str) -> List[str]:
+    def translate(self, texts: List[str], src: str, tgt: str, batch_size: int = 16) -> List[str]:
         if not texts:
             return []
         pipe = self._pipe(src, tgt)
-        outputs = pipe(texts, batch_size=16, truncation=True)
+        outputs = pipe(texts, batch_size=max(1, batch_size), truncation=True)
         return [o["translation_text"] for o in outputs]
 
 
@@ -126,15 +132,17 @@ class TranslateGemmaTranslator(Translator):
             }
         ]
 
-    def translate(self, texts: List[str], src: str, tgt: str) -> List[str]:
+    def translate(self, texts: List[str], src: str, tgt: str, batch_size: int = 16) -> List[str]:
         if not texts:
             return []
         self._ensure()
         results: List[str] = []
-        for text in texts:
-            output = self._pipe(text=self._build_messages(text, src, tgt), max_new_tokens=512)
-            content = output[0]["generated_text"][-1]["content"]
-            results.append(str(content).strip())
+        for chunk in _chunks(texts, batch_size):
+            messages = [self._build_messages(text, src, tgt) for text in chunk]
+            outputs = self._pipe(text=messages, max_new_tokens=512, batch_size=len(messages))
+            for output in outputs:
+                content = output[0]["generated_text"][-1]["content"]
+                results.append(str(content).strip())
         return results
 
 
@@ -162,6 +170,10 @@ class _CausalLMTranslator(Translator):
             self._tokenizer = AutoTokenizer.from_pretrained(
                 self.model_path, trust_remote_code=True
             )
+            # Decoder-only models require left padding for correct batched generation.
+            self._tokenizer.padding_side = "left"
+            if self._tokenizer.pad_token_id is None:
+                self._tokenizer.pad_token = self._tokenizer.eos_token
             self._model = AutoModelForCausalLM.from_pretrained(
                 self.model_path,
                 dtype=dtype,
@@ -175,24 +187,30 @@ class _CausalLMTranslator(Translator):
             f"{language_name(tgt)}. Output only the translation, no explanations:\n\n{text}"
         )
 
-    def translate(self, texts: List[str], src: str, tgt: str) -> List[str]:
+    def translate(self, texts: List[str], src: str, tgt: str, batch_size: int = 16) -> List[str]:
         if not texts:
             return []
         import torch
 
         self._ensure()
         results: List[str] = []
-        for text in texts:
-            messages = [{"role": "user", "content": self._prompt(text, src, tgt)}]
-            inputs = self._tokenizer.apply_chat_template(
-                messages, add_generation_prompt=True, return_tensors="pt"
+        for chunk in _chunks(texts, batch_size):
+            prompts = [
+                self._tokenizer.apply_chat_template(
+                    [{"role": "user", "content": self._prompt(text, src, tgt)}],
+                    add_generation_prompt=True,
+                    tokenize=False,
+                )
+                for text in chunk
+            ]
+            inputs = self._tokenizer(
+                prompts, return_tensors="pt", padding=True, add_special_tokens=False
             ).to(self._model.device)
             with torch.no_grad():
-                out = self._model.generate(inputs, max_new_tokens=512)
-            decoded = self._tokenizer.decode(
-                out[0][inputs.shape[-1] :], skip_special_tokens=True
-            )
-            results.append(decoded.strip())
+                out = self._model.generate(**inputs, max_new_tokens=512)
+            gen = out[:, inputs["input_ids"].shape[-1] :]
+            decoded = self._tokenizer.batch_decode(gen, skip_special_tokens=True)
+            results.extend(d.strip() for d in decoded)
         return results
 
 

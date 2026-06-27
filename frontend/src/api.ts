@@ -56,8 +56,10 @@ export async function ensureJobModels(
     body: JSON.stringify({
       source_lang: params.sourceLang,
       target_lang: params.targetLang,
+      asr_engine: params.asrEngine,
       asr_model: params.asrModel,
       forced_aligner_model: params.forcedAlignerModel,
+      whisper_model: params.whisperModel,
       translator_backend: params.translatorBackend,
       qc_enabled: params.qcEnabled,
     }),
@@ -89,9 +91,12 @@ export async function createJob(params: CreateJobParams): Promise<{ job_id: stri
   if (params.file) form.append("file", params.file);
   form.append("source_lang", params.sourceLang);
   form.append("target_lang", params.targetLang);
+  form.append("asr_engine", params.asrEngine);
   form.append("asr_model", params.asrModel);
   form.append("forced_aligner_model", params.forcedAlignerModel);
+  form.append("whisper_model", params.whisperModel);
   form.append("translator_backend", params.translatorBackend);
+  form.append("translate_batch_size", String(params.translateBatchSize));
   form.append("qc_enabled", params.qcEnabled ? "true" : "false");
   form.append("lmstudio_url", params.lmstudioUrl);
   form.append("lmstudio_model", params.lmstudioModel);
@@ -126,6 +131,7 @@ export async function getLanguages(): Promise<Record<string, string>> {
 export async function getAsrModels(): Promise<{
   asr_models: AsrModelOption[];
   forced_aligner_models: AsrModelOption[];
+  whisper_models: AsrModelOption[];
 }> {
   const res = await apiFetch(`${API}/asr-models`);
   if (!res.ok) throw new Error("Failed to load ASR models");

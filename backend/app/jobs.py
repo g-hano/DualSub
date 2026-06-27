@@ -111,10 +111,15 @@ class JobManager:
             self._update(job, JobStatus.segmenting, 0.5, "Building subtitle cues")
             segments = segment.segment_words(asr_result.words, cfg)
 
+            # Free the ASR model from the GPU before loading the translator.
+            asr.unload()
+
             self._update(job, JobStatus.translating, 0.6, "Translating")
             translator = translate.get_translator(cfg.translator_backend)
             source_texts = [s.text for s in segments]
-            translations = translator.translate(source_texts, src, tgt)
+            translations = translator.translate(
+                source_texts, src, tgt, batch_size=cfg.translate_batch_size
+            )
 
             if cfg.qc_enabled:
                 self._update(job, JobStatus.quality_check, 0.8, "Quality checking")

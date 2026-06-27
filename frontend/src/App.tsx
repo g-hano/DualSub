@@ -20,17 +20,45 @@ const STATUS_LABEL: Record<string, string> = {
   pending: "Queued",
   downloading: "Fetching media",
   extracting: "Extracting audio",
-  transcribing: "Transcribing (Qwen3-ASR)",
+  transcribing: "Transcribing",
   segmenting: "Building cues",
-  translating: "Translating (Helsinki)",
+  translating: "Translating",
   quality_check: "Quality check (LM Studio)",
   building: "Writing subtitles",
   done: "Done",
   error: "Error",
 };
 
+const TRANSLATOR_LABEL: Record<string, string> = {
+  helsinki: "Helsinki",
+  hunyuan: "Hunyuan",
+  translategemma: "TranslateGemma",
+};
+
+function shortModelName(repo: string): string {
+  const tail = repo.includes("/") ? repo.split("/").pop()! : repo;
+  return tail || repo;
+}
+
+function statusLabel(status: string, params: CreateJobParams | null): string {
+  if (status === "transcribing" && params) {
+    const model =
+      params.asrEngine === "whisper"
+        ? shortModelName(params.whisperModel)
+        : shortModelName(params.asrModel);
+    return `Transcribing (${model})`;
+  }
+  if (status === "translating" && params) {
+    const backend =
+      TRANSLATOR_LABEL[params.translatorBackend] ?? params.translatorBackend;
+    return `Translating (${backend})`;
+  }
+  return STATUS_LABEL[status] ?? status;
+}
+
 export default function App() {
   const [jobId, setJobId] = useState<string | null>(null);
+  const [jobParams, setJobParams] = useState<CreateJobParams | null>(null);
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [cues, setCues] = useState<Cue[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +85,7 @@ export default function App() {
     setCues(null);
     setProgress(null);
     setExportReady(false);
+    setJobParams(params);
     try {
       const ensure = await ensureJobModels(params);
       if (ensure.pending.length > 0) {
@@ -171,7 +200,7 @@ export default function App() {
 
         <div className="space-y-4">
           {progress && (
-            <ProgressPanel progress={progress} />
+            <ProgressPanel progress={progress} params={jobParams} />
           )}
 
           {cues && jobId ? (
@@ -208,14 +237,20 @@ export default function App() {
   );
 }
 
-function ProgressPanel({ progress }: { progress: ProgressEvent }) {
+function ProgressPanel({
+  progress,
+  params,
+}: {
+  progress: ProgressEvent;
+  params: CreateJobParams | null;
+}) {
   const pct = Math.round(progress.progress * 100);
   const isError = progress.status === "error";
   return (
     <div className="rounded-2xl border border-white/10 bg-panel/60 p-5">
       <div className="mb-2 flex items-center justify-between text-sm">
         <span className="font-semibold">
-          {STATUS_LABEL[progress.status] ?? progress.status}
+          {statusLabel(progress.status, params)}
         </span>
         <span className="text-white/50">{pct}%</span>
       </div>

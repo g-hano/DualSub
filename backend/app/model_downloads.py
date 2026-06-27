@@ -80,6 +80,27 @@ MODEL_REGISTRY: List[ModelEntry] = [
         description="Forced aligner with Hugging Face weight layout.",
     ),
     ModelEntry(
+        id="whisper-small",
+        repo_id="openai/whisper-small",
+        label="Whisper Small",
+        category=ModelCategory.asr,
+        description="Whisper small — fast, lower accuracy.",
+    ),
+    ModelEntry(
+        id="whisper-medium",
+        repo_id="openai/whisper-medium",
+        label="Whisper Medium",
+        category=ModelCategory.asr,
+        description="Whisper medium — balanced speed/accuracy.",
+    ),
+    ModelEntry(
+        id="whisper-large-v3",
+        repo_id="openai/whisper-large-v3",
+        label="Whisper Large v3",
+        category=ModelCategory.asr,
+        description="Whisper large v3 — best accuracy, most VRAM.",
+    ),
+    ModelEntry(
         id="opus-mt-sv-en",
         repo_id="Helsinki-NLP/opus-mt-sv-en",
         label="Helsinki opus-mt sv→en",
@@ -126,9 +147,14 @@ def repos_for_job(
     forced_aligner_model: str,
     translator_backend: str,
     qc_enabled: bool,
+    asr_engine: str = "qwen",
+    whisper_model: str = "openai/whisper-large-v3",
 ) -> List[str]:
     """Return Hugging Face repo ids required for a pipeline job."""
-    repos = [asr_model, forced_aligner_model]
+    if asr_engine == "whisper":
+        repos = [whisper_model]
+    else:
+        repos = [asr_model, forced_aligner_model]
     if translator_backend == "helsinki":
         repos.append(f"Helsinki-NLP/opus-mt-{source_lang}-{target_lang}")
         if qc_enabled:
@@ -212,7 +238,8 @@ class ModelDownloadManager:
             return _REGISTRY_BY_REPO[repo_id]
         model_id = f"repo:{repo_id.replace('/', '__')}"
         if model_id not in self._extras:
-            if "ASR" in repo_id or "Aligner" in repo_id or "aligner" in repo_id.lower():
+            lowered = repo_id.lower()
+            if "asr" in lowered or "aligner" in lowered or "whisper" in lowered:
                 category = ModelCategory.asr
             else:
                 category = ModelCategory.translation

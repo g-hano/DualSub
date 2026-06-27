@@ -52,6 +52,13 @@ FORCED_ALIGNER_MODELS: list[dict[str, str]] = [
     {"repo_id": "Qwen/Qwen3-ForcedAligner-0.6B-hf", "label": "Qwen3 Forced Aligner 0.6B (HF weights)"},
 ]
 
+# Whisper presets exposed in the UI; a custom HF model name can also be supplied.
+WHISPER_MODELS: list[dict[str, str]] = [
+    {"repo_id": "openai/whisper-small", "label": "Whisper Small"},
+    {"repo_id": "openai/whisper-medium", "label": "Whisper Medium"},
+    {"repo_id": "openai/whisper-large-v3", "label": "Whisper Large v3"},
+]
+
 
 class PipelineConfig(BaseModel):
     """Per-job configuration controlling the transcription/translation pipeline."""
@@ -59,10 +66,14 @@ class PipelineConfig(BaseModel):
     source_lang: str = Field("sv", description="ISO code of the spoken language")
     target_lang: str = Field("en", description="ISO code of the translation language")
 
+    asr_engine: Literal["qwen", "whisper"] = "qwen"
     asr_model: str = "Qwen/Qwen3-ASR-1.7B"
     forced_aligner_model: str = "Qwen/Qwen3-ForcedAligner-0.6B"
+    # Used when asr_engine == "whisper"; accepts a preset repo id or a custom HF name.
+    whisper_model: str = "openai/whisper-large-v3"
 
     translator_backend: Literal["helsinki", "hunyuan", "translategemma"] = "helsinki"
+    translate_batch_size: int = Field(16, ge=1, le=128, description="Cues per translation batch")
 
     qc_enabled: bool = False
     lmstudio_url: str = "http://localhost:1234/v1"
