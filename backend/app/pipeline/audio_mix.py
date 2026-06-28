@@ -67,6 +67,16 @@ def mono_sample_count(path: Path, target_sr: int = TARGET_SR) -> int:
     return len(_load_mono(path, target_sr))
 
 
+def load_accompaniment(job_dir: Path, wav_path: Path) -> tuple[np.ndarray, int, bool]:
+    """Load cached accompaniment.wav if present, otherwise run Demucs separation."""
+    accomp_path = job_dir / "accompaniment.wav"
+    if accomp_path.exists():
+        data = _load_mono(accomp_path, TARGET_SR)
+        logger.info("Loaded cached accompaniment from %s", accomp_path.name)
+        return data, TARGET_SR, True
+    return separate_accompaniment(wav_path, job_dir, keep_background=True)
+
+
 def separate_accompaniment(
     wav_path: Path,
     job_dir: Path,
@@ -79,6 +89,11 @@ def separate_accompaniment(
     """
     vocals_path = job_dir / "vocals_orig.wav"
     accomp_path = job_dir / "accompaniment.wav"
+
+    if accomp_path.exists():
+        data = _load_mono(accomp_path, TARGET_SR)
+        logger.info("Using existing accompaniment cache")
+        return data, TARGET_SR, True
 
     if not keep_background:
         dur_samples = len(_load_mono(wav_path))
@@ -93,8 +108,10 @@ def separate_accompaniment(
         model = get_model("htdemucs")
         model.eval()
         wav, sr = torchaudio.load(str(wav_path))
-        if wav.shape[0] > 1:
-            wav = wav.mean(dim=0, keepdim=True)
+        if wav.shape[0] == 1:
+            wav = wav.repeat(2, 1)
+        elif wav.shape[0] > 2:
+            wav = wav[:2]
         ref_sr = model.samplerate
         if sr != ref_sr:
             wav = torchaudio.functional.resample(wav, sr, ref_sr)
@@ -117,7 +134,7 @@ def separate_accompaniment(
         logger.info("Demucs separation complete")
         return accomp_mono.astype(np.float32), TARGET_SR, True
     except Exception as exc:
-        logger.warning("Demucs separation failed (%s); will use original-audio fallback", exc)
+        logger.warning("Demucs separation failed (%s); dubbed vocals only", exc)
         return np.zeros(0, dtype=np.float32), TARGET_SR, False
 
 
@@ -134,18 +151,8 @@ def mix_dubbed(
     """Mix dubbed vocals with accompaniment (or original-audio fallback)."""
     dubbed = _load_mono(dubbed_vocals_path, TARGET_SR)
     if len(accompaniment) == 0:
-        if original_wav is not None and original_wav.exists():
-            orig = _load_mono(original_wav, TARGET_SR)
-            n = max(len(dubbed), len(orig))
-            d = np.pad(dubbed, (0, n - len(dubbed)))
-            o = np.pad(orig, (0, n - len(orig)))
-            mixed = d + o * fallback_original_level
-            logger.info(
-                "Mixed dubbed vocals with original audio at %.0f%% (Demucs fallback)",
-                fallback_original_level * 100,
-            )
-        else:
-            mixed = dubbed
+        logger.info("No accompaniment available; using dubbed vocals only")
+        mixed = dubbed
     else:
         n = max(len(dubbed), len(accompaniment))
         d = np.pad(dubbed, (0, n - len(dubbed)))

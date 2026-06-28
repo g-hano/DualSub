@@ -1329,64 +1329,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d5/9d/9a13947db237375486c0690f4741dd2b7e1eee20e0ffcb55dbd1b21cc600/dora_search-0.1.12.tar.gz", hash = "sha256:2956fd2c4c7e4b9a4830e83f0d4cf961be45cfba1a2f0570281e91d15ac516fb", size = 87111, upload-time = "2023-05-23T14:36:24.743Z" }
 
 [[package]]
-name = "dual-subtitle-pipeline"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "demucs" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "huggingface-hub" },
-    { name = "kokoro" },
-    { name = "librosa" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "python-multipart" },
-    { name = "qwen-asr" },
-    { name = "qwen-tts" },
-    { name = "sacremoses" },
-    { name = "sentencepiece" },
-    { name = "soundfile" },
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "torchvision" },
-    { name = "transformers" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "voxcpm" },
-    { name = "websockets" },
-    { name = "yt-dlp", extra = ["default"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "demucs", specifier = ">=4.0" },
-    { name = "fastapi", specifier = "==0.115.6" },
-    { name = "httpx", specifier = "==0.28.1" },
-    { name = "huggingface-hub", specifier = ">=0.26.0" },
-    { name = "kokoro", specifier = ">=0.9.2" },
-    { name = "librosa", specifier = ">=0.11.0" },
-    { name = "numpy", specifier = ">=1.26.0" },
-    { name = "pydantic", specifier = "==2.10.4" },
-    { name = "pydantic-settings", specifier = "==2.7.1" },
-    { name = "python-multipart", specifier = "==0.0.20" },
-    { name = "qwen-asr", specifier = ">=0.0.6" },
-    { name = "qwen-tts" },
-    { name = "sacremoses", specifier = "==0.1.1" },
-    { name = "sentencepiece", specifier = "==0.2.0" },
-    { name = "soundfile", specifier = "==0.13.0" },
-    { name = "torch", index = "https://download.pytorch.org/whl/cu118" },
-    { name = "torchaudio", index = "https://download.pytorch.org/whl/cu118" },
-    { name = "torchvision", index = "https://download.pytorch.org/whl/cu118" },
-    { name = "transformers", specifier = ">=4.57.6" },
-    { name = "uvicorn", extras = ["standard"], specifier = "==0.34.0" },
-    { name = "voxcpm" },
-    { name = "websockets", specifier = ">=14.1" },
-    { name = "yt-dlp", extras = ["default"], specifier = ">=2026.6.9" },
-]
-
-[[package]]
 name = "dynet38"
 version = "2.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4061,6 +4003,64 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d7/47/e4501f49c178ae1d9f4a75073fda4204f52647993f075a9db4d14930e0c5/platformdirs-4.10.0.tar.gz", hash = "sha256:31e761a6a0ca04faf7353ea759bdba55652be214725111e5aac52dfa29d4bef7", size = 31224, upload-time = "2026-05-28T03:32:53.587Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/e6/cd9575ac904136b3cbf7aa7ee819ef86eedb7274e46f230e94ea4342e729/platformdirs-4.10.0-py3-none-any.whl", hash = "sha256:fb516cdb12eb0d857d0cd85a7c57cea4d060bee4578d6cf5a14dfdf8cbf8784a", size = 22743, upload-time = "2026-05-28T03:32:52.175Z" },
+]
+
+[[package]]
+name = "polyvoice"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "demucs" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "huggingface-hub" },
+    { name = "kokoro" },
+    { name = "librosa" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "python-multipart" },
+    { name = "qwen-asr" },
+    { name = "qwen-tts" },
+    { name = "sacremoses" },
+    { name = "sentencepiece" },
+    { name = "soundfile" },
+    { name = "torch" },
+    { name = "torchaudio" },
+    { name = "torchvision" },
+    { name = "transformers" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "voxcpm" },
+    { name = "websockets" },
+    { name = "yt-dlp", extra = ["default"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "demucs", specifier = ">=4.0" },
+    { name = "fastapi", specifier = "==0.115.6" },
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "huggingface-hub", specifier = ">=0.26.0" },
+    { name = "kokoro", specifier = ">=0.9.2" },
+    { name = "librosa", specifier = ">=0.11.0" },
+    { name = "numpy", specifier = ">=1.26.0" },
+    { name = "pydantic", specifier = "==2.10.4" },
+    { name = "pydantic-settings", specifier = "==2.7.1" },
+    { name = "python-multipart", specifier = "==0.0.20" },
+    { name = "qwen-asr", specifier = ">=0.0.6" },
+    { name = "qwen-tts" },
+    { name = "sacremoses", specifier = "==0.1.1" },
+    { name = "sentencepiece", specifier = "==0.2.0" },
+    { name = "soundfile", specifier = "==0.13.0" },
+    { name = "torch", index = "https://download.pytorch.org/whl/cu118" },
+    { name = "torchaudio", index = "https://download.pytorch.org/whl/cu118" },
+    { name = "torchvision", index = "https://download.pytorch.org/whl/cu118" },
+    { name = "transformers", specifier = ">=4.57.6" },
+    { name = "uvicorn", extras = ["standard"], specifier = "==0.34.0" },
+    { name = "voxcpm" },
+    { name = "websockets", specifier = ">=14.1" },
+    { name = "yt-dlp", extras = ["default"], specifier = ">=2026.6.9" },
 ]
 
 [[package]]

@@ -120,14 +120,49 @@ def _track_style_line(name: str, track: TrackStyle, margin_v: int) -> str:
     )
 
 
-def build_ass_header(style: Optional[SubtitleStyleConfig] = None) -> str:
+def probe_video_size(path: Path) -> tuple[int, int]:
+    """Return (width, height) of the first video stream, or 1920x1080 if unknown."""
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return 1920, 1080
+    cmd = [
+        ffprobe,
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height",
+        "-of",
+        "csv=p=0:s=x",
+        str(path),
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        return 1920, 1080
+    try:
+        w_str, h_str = proc.stdout.strip().split("x")
+        w, h = int(w_str), int(h_str)
+        if w > 0 and h > 0:
+            return w, h
+    except ValueError:
+        pass
+    return 1920, 1080
+
+
+def build_ass_header(
+    style: Optional[SubtitleStyleConfig] = None,
+    *,
+    play_res_x: int = 1920,
+    play_res_y: int = 1080,
+) -> str:
     style = style or SubtitleStyleConfig()
-    source_line = _track_style_line("Source", style.source, 120)
-    target_line = _track_style_line("Target", style.target, 60)
+    source_line = _track_style_line("Source", style.source, max(60, int(play_res_y * 0.11)))
+    target_line = _track_style_line("Target", style.target, max(40, int(play_res_y * 0.055)))
     return f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: 1920
-PlayResY: 1080
+PlayResX: {play_res_x}
+PlayResY: {play_res_y}
 WrapStyle: 2
 ScaledBorderAndShadow: yes
 
@@ -157,8 +192,14 @@ def _karaoke_line(words: List[Word], cue_start: float) -> str:
     return "".join(parts).strip()
 
 
-def build_ass(cues: List[Cue], style: Optional[SubtitleStyleConfig] = None) -> str:
-    lines = [build_ass_header(style)]
+def build_ass(
+    cues: List[Cue],
+    style: Optional[SubtitleStyleConfig] = None,
+    *,
+    play_res_x: int = 1920,
+    play_res_y: int = 1080,
+) -> str:
+    lines = [build_ass_header(style, play_res_x=play_res_x, play_res_y=play_res_y)]
     for cue in cues:
         start = _fmt_ass_time(cue.start)
         end = _fmt_ass_time(cue.end)
@@ -181,9 +222,15 @@ def write_artifacts(
     cues: List[Cue],
     job_dir: Path,
     style: Optional[SubtitleStyleConfig] = None,
+    *,
+    media_path: Optional[Path] = None,
 ) -> tuple[Path, Path]:
     """Write cues.json and subtitles.ass; return their paths."""
     import json
+
+    play_res_x, play_res_y = 1920, 1080
+    if media_path is not None and media_path.exists():
+        play_res_x, play_res_y = probe_video_size(media_path)
 
     cues_path = job_dir / "cues.json"
     ass_path = job_dir / "subtitles.ass"
@@ -191,7 +238,10 @@ def write_artifacts(
         json.dumps([c.model_dump() for c in cues], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    ass_path.write_text(build_ass(cues, style), encoding="utf-8")
+    ass_path.write_text(
+        build_ass(cues, style, play_res_x=play_res_x, play_res_y=play_res_y),
+        encoding="utf-8",
+    )
     return cues_path, ass_path
 
 

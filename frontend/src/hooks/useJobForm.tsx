@@ -5,6 +5,7 @@ import type {
   AsrModelOption,
   JobFormSubmitParams,
   JobMode,
+  LlmProvider,
   TtsBackend,
   TtsBackendInfo,
   TtsModelsResponse,
@@ -27,6 +28,24 @@ export const TTS_BACKEND_LABELS: Record<TtsBackend, string> = {
   omnivoice: "OmniVoice",
   higgs: "Higgs TTS (external server)",
 };
+
+export const LLM_PROVIDER_PRESETS = {
+  lmstudio: {
+    label: "LM Studio",
+    url: "http://localhost:1234/v1",
+    model: "local-model",
+  },
+  ollama: {
+    label: "Ollama",
+    url: "http://localhost:11434/v1",
+    model: "llama3.2",
+  },
+  llamacpp: {
+    label: "llama.cpp server",
+    url: "http://localhost:8080/v1",
+    model: "",
+  },
+} as const;
 
 export const CUSTOM_WHISPER_VALUE = CUSTOM_WHISPER;
 
@@ -99,8 +118,9 @@ function useJobFormState(onSubmit: (params: JobFormSubmitParams) => void, busy: 
   const [hunyuanModel, setHunyuanModel] = useState("tencent/HY-MT1.5-1.8B");
   const [translateBatchSize, setTranslateBatchSize] = useState(16);
   const [qcEnabled, setQcEnabled] = useState(false);
-  const [lmstudioUrl, setLmstudioUrl] = useState("http://localhost:1234/v1");
-  const [lmstudioModel, setLmstudioModel] = useState("local-model");
+  const [llmProvider, setLlmProvider] = useState<LlmProvider>("lmstudio");
+  const [llmBaseUrl, setLlmBaseUrl] = useState<string>(LLM_PROVIDER_PRESETS.lmstudio.url);
+  const [llmModel, setLlmModel] = useState<string>(LLM_PROVIDER_PRESETS.lmstudio.model);
 
   const [ttsMeta, setTtsMeta] = useState<TtsModelsResponse | null>(null);
   const [ttsBackend, setTtsBackend] = useState<TtsBackend>("qwen");
@@ -114,6 +134,14 @@ function useJobFormState(onSubmit: (params: JobFormSubmitParams) => void, busy: 
   const [voiceCloneXVectorOnly, setVoiceCloneXVectorOnly] = useState(false);
   const [higgsServerUrl, setHiggsServerUrl] = useState("http://localhost:8000");
   const [keepBackground, setKeepBackground] = useState(true);
+  const [backgroundMixLevel, setBackgroundMixLevel] = useState(0.85);
+
+  const handleLlmProviderChange = (provider: LlmProvider) => {
+    setLlmProvider(provider);
+    const preset = LLM_PROVIDER_PRESETS[provider];
+    setLlmBaseUrl(preset.url);
+    if (preset.model) setLlmModel(preset.model);
+  };
 
   useEffect(() => {
     getLanguages()
@@ -207,8 +235,11 @@ function useJobFormState(onSubmit: (params: JobFormSubmitParams) => void, busy: 
       hunyuanModel,
       translateBatchSize,
       qcEnabled,
-      lmstudioUrl,
-      lmstudioModel,
+      llmProvider,
+      llmBaseUrl,
+      llmModel,
+      lmstudioUrl: llmBaseUrl,
+      lmstudioModel: llmModel,
       ttsBackend,
       ttsModel,
       voiceMode,
@@ -220,6 +251,7 @@ function useJobFormState(onSubmit: (params: JobFormSubmitParams) => void, busy: 
       voiceCloneXVectorOnly,
       higgsServerUrl,
       keepBackground,
+      backgroundMixLevel,
     });
   };
 
@@ -286,10 +318,13 @@ function useJobFormState(onSubmit: (params: JobFormSubmitParams) => void, busy: 
     setTranslateBatchSize,
     qcEnabled,
     setQcEnabled,
-    lmstudioUrl,
-    setLmstudioUrl,
-    lmstudioModel,
-    setLmstudioModel,
+    llmProvider,
+    setLlmProvider,
+    handleLlmProviderChange,
+    llmBaseUrl,
+    setLlmBaseUrl,
+    llmModel,
+    setLlmModel,
     ttsMeta,
     ttsBackend,
     handleTtsBackendChange,
@@ -313,6 +348,8 @@ function useJobFormState(onSubmit: (params: JobFormSubmitParams) => void, busy: 
     setHiggsServerUrl,
     keepBackground,
     setKeepBackground,
+    backgroundMixLevel,
+    setBackgroundMixLevel,
     backendInfo,
     isVoiceDesign,
     qwenKind,

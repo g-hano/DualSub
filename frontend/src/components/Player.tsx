@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SubtitleStyleSettings } from "../hooks/useSubtitleStyleSettings";
 import type { Cue } from "../types";
 import SubtitleOverlay from "./SubtitleOverlay";
+import { IconChevron } from "./ui/Icons";
+
+const TRANSCRIPT_WIDTH = 320;
 
 function findCueIndex(cues: Cue[], time: number): number {
   let lo = 0;
@@ -31,13 +34,16 @@ export default function Player({
   src,
   cues,
   style,
+  showSubtitles = true,
 }: {
   src: string;
   cues: Cue[];
   style: SubtitleStyleSettings;
+  showSubtitles?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
+  const [transcriptOpen, setTranscriptOpen] = useState(true);
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
@@ -59,12 +65,16 @@ export default function Player({
 
   return (
     <div className="flex flex-1 flex-col gap-4 xl:flex-row xl:items-start">
-      {/* Video panel */}
       <div className="min-w-0 flex-1">
-        <div className="overflow-hidden rounded-xl border border-border bg-black shadow-lg shadow-black/40">
-          <div className="relative aspect-video w-full">
-            <video ref={videoRef} src={src} controls className="absolute inset-0 h-full w-full" />
-            {activeCue && (
+        <div className="flex justify-center overflow-hidden rounded-xl border border-border bg-black shadow-lg shadow-black/40">
+          <div className="relative inline-block max-w-full">
+            <video
+              ref={videoRef}
+              src={src}
+              controls
+              className="block max-h-[min(50vh,480px)] max-w-full"
+            />
+            {showSubtitles && activeCue && (
               <SubtitleOverlay
                 source={activeCue.source}
                 target={activeCue.target}
@@ -79,9 +89,40 @@ export default function Player({
         </p>
       </div>
 
-      {/* Transcript panel */}
-      <div className="w-full shrink-0 xl:w-80">
-        <div className="flex h-full max-h-[28rem] flex-col overflow-hidden rounded-xl border border-border bg-[var(--panel-bg)] xl:max-h-[calc(100vh-16rem)]">
+      <div className="relative hidden shrink-0 xl:block">
+        <button
+          type="button"
+          onClick={() => setTranscriptOpen((v) => !v)}
+          aria-expanded={transcriptOpen}
+          aria-label={transcriptOpen ? "Hide transcript" : "Show transcript"}
+          title={transcriptOpen ? "Hide transcript" : "Show transcript"}
+          className="absolute top-6 z-20 flex h-10 w-7 items-center justify-center rounded-r-lg border border-border bg-[var(--panel-bg)] text-zinc-400 shadow-md transition-all duration-300 ease-in-out hover:bg-zinc-800 hover:text-zinc-200"
+          style={{ left: transcriptOpen ? -28 : 0 }}
+        >
+          <IconChevron
+            className={`h-4 w-4 transition-transform duration-300 ${transcriptOpen ? "-rotate-90" : "rotate-90"}`}
+          />
+        </button>
+
+        <aside
+          className="overflow-hidden rounded-xl border border-border bg-[var(--panel-bg)] transition-[width] duration-300 ease-in-out"
+          style={{ width: transcriptOpen ? TRANSCRIPT_WIDTH : 0, borderWidth: transcriptOpen ? undefined : 0 }}
+        >
+          <div
+            className="flex max-h-[calc(100vh-16rem)] flex-col overflow-hidden xl:max-h-[calc(100vh-16rem)]"
+            style={{ width: TRANSCRIPT_WIDTH }}
+          >
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="text-sm font-medium text-zinc-200">Transcript</h3>
+              <p className="text-xs text-zinc-500">{cues.length} lines</p>
+            </div>
+            <Transcript cues={cues} activeIndex={activeIndex} style={style} onSeek={seek} />
+          </div>
+        </aside>
+      </div>
+
+      <div className="w-full shrink-0 xl:hidden">
+        <div className="flex max-h-[28rem] flex-col overflow-hidden rounded-xl border border-border bg-[var(--panel-bg)]">
           <div className="border-b border-border px-4 py-3">
             <h3 className="text-sm font-medium text-zinc-200">Transcript</h3>
             <p className="text-xs text-zinc-500">{cues.length} lines</p>

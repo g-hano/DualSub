@@ -1,7 +1,7 @@
 [project]
-name = "dual-subtitle-pipeline"
+name = "polyvoice"
 version = "0.1.0"
-description = "Transcribe, translate, and dual-subtitle videos with word-level highlighting"
+description = "Local AI pipeline for transcription, translation, subtitles and dubbing"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi==0.115.6",

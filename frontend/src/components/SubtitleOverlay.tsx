@@ -51,7 +51,7 @@ function TrackLine({
 }) {
   return (
     <div
-      className="max-w-4xl rounded-xl px-5 py-2 leading-snug backdrop-blur-sm"
+      className="max-w-[95%] rounded-xl px-5 py-2 leading-snug backdrop-blur-sm"
       style={{
         fontSize: track.font_size,
         fontFamily: track.font_family,
@@ -78,7 +78,7 @@ export default function SubtitleOverlay({
   style: SubtitleStyleSettings;
 }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-6 pb-8 text-center">
+    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end gap-2 px-4 pb-6 text-center">
       <TrackLine line={source} time={time} track={style.source} />
       <TrackLine line={target} time={time} track={style.target} />
     </div>

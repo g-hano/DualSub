@@ -31,7 +31,7 @@ export default function SegmentedControl<T extends string>({
               : "text-zinc-500 hover:text-zinc-300"
           }`}
         >
-          {opt.icon}
+          {opt.icon && <span className="shrink-0">{opt.icon}</span>}
           {opt.label}
         </button>
       ))}

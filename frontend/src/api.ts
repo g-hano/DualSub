@@ -132,8 +132,11 @@ export async function createJob(params: CreateJobParams): Promise<{ job_id: stri
   form.append("hunyuan_model", params.hunyuanModel);
   form.append("translate_batch_size", String(params.translateBatchSize));
   form.append("qc_enabled", params.qcEnabled ? "true" : "false");
-  form.append("lmstudio_url", params.lmstudioUrl);
-  form.append("lmstudio_model", params.lmstudioModel);
+  form.append("llm_provider", params.llmProvider);
+  form.append("llm_base_url", params.llmBaseUrl);
+  form.append("llm_model", params.llmModel);
+  form.append("lmstudio_url", params.llmBaseUrl);
+  form.append("lmstudio_model", params.llmModel);
   form.append("subtitle_style", JSON.stringify(params.subtitleStyle));
   form.append("tts_backend", params.ttsBackend);
   form.append("tts_model", params.ttsModel);
@@ -145,6 +148,7 @@ export async function createJob(params: CreateJobParams): Promise<{ job_id: stri
   form.append("voice_clone_x_vector_only", params.voiceCloneXVectorOnly ? "true" : "false");
   form.append("higgs_server_url", params.higgsServerUrl);
   form.append("keep_background", params.keepBackground ? "true" : "false");
+  form.append("background_mix_level", String(params.backgroundMixLevel));
   if (params.refAudioFile) form.append("ref_audio", params.refAudioFile);
 
   const res = await apiFetch(`${API}/jobs`, { method: "POST", body: form });

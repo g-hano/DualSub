@@ -1,4 +1,4 @@
-"""Hugging Face model registry, cache inspection, and background downloads."""
+"""HuggingFace model registry, cache inspection, and background downloads."""
 from __future__ import annotations
 
 import asyncio
@@ -59,14 +59,14 @@ MODEL_REGISTRY: List[ModelEntry] = [
         repo_id="Qwen/Qwen3-ASR-1.7B-hf",
         label="Qwen3 ASR 1.7B (HF weights)",
         category=ModelCategory.asr,
-        description="1.7B ASR with Hugging Face weight layout.",
+        description="1.7B ASR with HuggingFace weight layout.",
     ),
     ModelEntry(
         id="qwen3-asr-0.6b-hf",
         repo_id="Qwen/Qwen3-ASR-0.6B-hf",
         label="Qwen3 ASR 0.6B (HF weights)",
         category=ModelCategory.asr,
-        description="0.6B ASR with Hugging Face weight layout.",
+        description="0.6B ASR with HuggingFace weight layout.",
     ),
     ModelEntry(
         id="qwen3-forced-aligner-0.6b",
@@ -81,7 +81,7 @@ MODEL_REGISTRY: List[ModelEntry] = [
         repo_id="Qwen/Qwen3-ForcedAligner-0.6B-hf",
         label="Qwen3 Forced Aligner 0.6B (HF weights)",
         category=ModelCategory.asr,
-        description="Forced aligner with Hugging Face weight layout.",
+        description="Forced aligner with HuggingFace weight layout.",
     ),
     ModelEntry(
         id="whisper-small",
@@ -315,7 +315,7 @@ def repos_for_job(
     tts_backend: str = "qwen",
     tts_model: str = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
 ) -> List[str]:
-    """Return Hugging Face repo ids required for a pipeline job."""
+    """Return HuggingFace repo ids required for a pipeline job."""
     if asr_engine == "whisper":
         repos = [whisper_model]
     elif asr_engine == "nemotron":
@@ -424,7 +424,7 @@ class ModelDownloadManager:
             try:
                 info = api.whoami()
             except Exception as exc:  # noqa: BLE001
-                raise ValueError(f"Invalid Hugging Face token: {exc}") from exc
+                raise ValueError(f"Invalid HuggingFace token: {exc}") from exc
             self.runtime_hf_token = token
             self._apply_hf_token_env()
             return {

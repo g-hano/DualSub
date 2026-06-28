@@ -1,4 +1,4 @@
-import type { FormEvent, HTMLAttributes, ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 export default function Card({
   children,

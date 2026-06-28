@@ -1,4 +1,4 @@
-"""Configuration models and global settings for the dual-subtitle pipeline."""
+"""Configuration models and global settings for the PolyVoice pipeline."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -364,9 +364,12 @@ class PipelineConfig(BaseModel):
     translate_batch_size: int = Field(16, ge=1, le=128, description="Cues per translation batch")
 
     qc_enabled: bool = False
+    llm_provider: Literal["lmstudio", "ollama", "llamacpp"] = "lmstudio"
+    llm_base_url: str = "http://localhost:1234/v1"
+    llm_model: str = "local-model"
     lmstudio_url: str = "http://localhost:1234/v1"
     lmstudio_model: str = "local-model"
-    qc_batch_size: int = Field(8, ge=1, le=32, description="Subtitle cues per LM Studio QC request")
+    qc_batch_size: int = Field(8, ge=1, le=32, description="Subtitle cues per LLM QC request")
 
     subtitle_style: SubtitleStyleConfig = Field(default_factory=SubtitleStyleConfig)
 

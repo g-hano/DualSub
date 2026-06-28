@@ -9,16 +9,17 @@ import {
 } from "../api";
 import type { HfAuthStatus, ModelInfo, ModelProgressEvent } from "../types";
 import Alert from "./ui/Alert";
+import Accordion from "./ui/Accordion";
 import Badge from "./ui/Badge";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 import { IconDatabase } from "./ui/Icons";
-
-const CATEGORY_LABEL: Record<string, string> = {
-  asr: "Speech recognition",
-  translation: "Translation",
-  tts: "Text-to-speech (dubbing)",
-};
+import {
+  CATEGORY_ORDER,
+  categoryLabel,
+  groupModels,
+  subgroupSummary,
+} from "../utils/modelGroups";
 
 const STATUS_LABEL: Record<string, string> = {
   not_downloaded: "Not downloaded",
@@ -176,10 +177,7 @@ export default function ModelsModal({
 
   if (!open) return null;
 
-  const grouped = models.reduce<Record<string, ModelInfo[]>>((acc, m) => {
-    (acc[m.category] ??= []).push(m);
-    return acc;
-  }, {});
+  const grouped = groupModels(models);
 
   const requiredMissing = models.some((m) => m.required && m.status !== "downloaded");
   const anyDownloading = models.some((m) => m.status === "downloading");
@@ -200,10 +198,10 @@ export default function ModelsModal({
             </span>
             <div>
               <h2 id="models-modal-title" className="text-lg font-semibold text-zinc-100">
-                Model library
+                Model Library
               </h2>
               <p className="mt-0.5 text-sm text-zinc-500">
-                Download Hugging Face models before running jobs
+                Download HuggingFace models before running jobs
               </p>
             </div>
           </div>
@@ -247,22 +245,51 @@ export default function ModelsModal({
           {loading && models.length === 0 ? (
             <p className="py-8 text-center text-sm text-zinc-500">Loading models…</p>
           ) : (
-            Object.entries(grouped).map(([category, items]) => (
-              <section key={category} className="mb-6 last:mb-0">
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  {CATEGORY_LABEL[category] ?? category}
-                </h3>
-                <ul className="space-y-2">
-                  {items.map((model) => (
-                    <ModelRow
-                      key={model.id}
-                      model={model}
-                      onDownload={() => handleDownload(model.id)}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))
+            <div className="space-y-2">
+              {CATEGORY_ORDER.map((category) => {
+                const subgroups = grouped[category];
+                if (subgroups.length === 0) return null;
+                const allInCategory = subgroups.flatMap((sg) => sg.models);
+                return (
+                  <Accordion
+                    key={category}
+                    title={categoryLabel(category)}
+                    description={subgroupSummary(allInCategory)}
+                    icon={<IconDatabase className="h-4 w-4" />}
+                    defaultOpen={false}
+                    variant="ghost"
+                  >
+                    <div className="space-y-2">
+                      {subgroups.map((subgroup) => (
+                        <Accordion
+                          key={subgroup.id}
+                          title={subgroup.label}
+                          description={subgroupSummary(subgroup.models)}
+                          defaultOpen={false}
+                          variant="ghost"
+                          nested
+                          badge={
+                            subgroup.models.some((m) => m.required && m.status !== "downloaded") ? (
+                              <Badge variant="warning">Required</Badge>
+                            ) : undefined
+                          }
+                        >
+                          <ul className="space-y-2">
+                            {subgroup.models.map((model) => (
+                              <ModelRow
+                                key={model.id}
+                                model={model}
+                                onDownload={() => handleDownload(model.id)}
+                              />
+                            ))}
+                          </ul>
+                        </Accordion>
+                      ))}
+                    </div>
+                  </Accordion>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -405,7 +432,7 @@ function HfTokenSection() {
   return (
     <div className="rounded-xl border border-border bg-[var(--panel-bg)] p-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-zinc-200">Hugging Face token</p>
+        <p className="text-sm font-medium text-zinc-200">HuggingFace token</p>
         <span className="text-xs text-zinc-500">{statusText}</span>
       </div>
       <p className="mb-3 text-xs text-zinc-500">

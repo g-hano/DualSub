@@ -1,4 +1,5 @@
 import type { SubtitleStyleSettings, TrackStyle } from "../types";
+import Accordion from "./ui/Accordion";
 import Select from "./ui/Select";
 import Input from "./ui/Input";
 
@@ -46,7 +47,7 @@ export default function SubtitleSettingsPanel({
           Reset
         </button>
       </div>
-      <div className="space-y-6">
+      <div className="space-y-3">
         <TrackEditor
           label={sourceLabel}
           track={settings.source}
@@ -76,8 +77,12 @@ function TrackEditor({
   onChange: (patch: Partial<TrackStyle>) => void;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-[var(--panel-bg)] p-4">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
+    <Accordion
+      title={label}
+      description={`${track.font_family} · ${track.font_size}px`}
+      defaultOpen={false}
+      variant="ghost"
+    >
       <div className="space-y-3">
         <Select
           label="Font"
@@ -168,7 +173,7 @@ function TrackEditor({
           Sample — {label}
         </p>
       </div>
-    </div>
+    </Accordion>
   );
 }
 

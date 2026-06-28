@@ -59,7 +59,7 @@ export default function FileDropZone({
         </>
       ) : (
         <>
-          <p className="text-sm font-medium text-zinc-300">Drop video or audio here</p>
+          <p className="text-sm font-medium text-zinc-300">Drop Video or Audio Here</p>
           <p className="mt-1 text-xs text-zinc-500">or click to browse files</p>
         </>
       )}

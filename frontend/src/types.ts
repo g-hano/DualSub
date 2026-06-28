@@ -75,6 +75,8 @@ export interface SubtitleStyleSettings {
   target: TrackStyle;
 }
 
+export type LlmProvider = "lmstudio" | "ollama" | "llamacpp";
+
 export interface CreateJobParams {
   sourceUrl?: string;
   file?: File | null;
@@ -91,6 +93,9 @@ export interface CreateJobParams {
   hunyuanModel: string;
   translateBatchSize: number;
   qcEnabled: boolean;
+  llmProvider: LlmProvider;
+  llmBaseUrl: string;
+  llmModel: string;
   lmstudioUrl: string;
   lmstudioModel: string;
   subtitleStyle: SubtitleStyleSettings;
@@ -105,6 +110,7 @@ export interface CreateJobParams {
   voiceCloneXVectorOnly: boolean;
   higgsServerUrl: string;
   keepBackground: boolean;
+  backgroundMixLevel: number;
 }
 
 /** Job form fields; subtitle style is configured separately below the player. */

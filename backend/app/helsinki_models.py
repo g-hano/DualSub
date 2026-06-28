@@ -53,7 +53,7 @@ def helsinki_pair_available(src: str, tgt: str) -> bool:
 
 
 def resolve_helsinki_repo(src: str, tgt: str) -> str:
-    """Return the Hugging Face repo id for a Helsinki opus-mt direction."""
+    """Return the HuggingFace repo id for a Helsinki opus-mt direction."""
     key = (src.lower(), tgt.lower())
     repo = _pair_index().get(key)
     if repo is None:

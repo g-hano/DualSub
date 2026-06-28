@@ -1,12 +1,13 @@
 """Quality control for translations.
 
 Strategy: take the source text and its translation, back-translate the
-translation (tgt -> src), then ask an LM Studio LLM to compare the original
-source with the back-translation. If meaning diverged, the LLM returns a
-corrected translation; otherwise the original translation is kept.
+translation (tgt -> src), then ask a local LLM (OpenAI-compatible API) to
+compare the original source with the back-translation. If meaning diverged,
+the LLM returns a corrected translation; otherwise the original translation
+is kept.
 
 Requests are sent in small batches (not the full transcript at once) to keep
-prompts within context limits and reduce LM Studio channel errors.
+prompts within context limits.
 """
 from __future__ import annotations
 
@@ -22,8 +23,6 @@ from .translate import get_translator
 
 logger = logging.getLogger(__name__)
 
-# Avoid angle-bracket placeholders — they confuse structured-output parsers
-# and show up truncated in LM Studio logs.
 _SYSTEM_PROMPT = (
     "You are a meticulous bilingual translation reviewer. You receive numbered "
     "subtitle pairs: original text, its machine translation, and a back-translation "
@@ -38,7 +37,6 @@ _SYSTEM_PROMPT = (
     "- No markdown, no code fences, no commentary."
 )
 
-# Pause between LM Studio requests to avoid rapid-fire channel errors.
 _BATCH_DELAY_SEC = 0.4
 
 
@@ -70,52 +68,55 @@ def _build_batch_prompt(
     return "\n".join(lines)
 
 
-def _lmstudio_chat_url(lmstudio_url: str) -> str:
-    """Resolve the native LM Studio chat endpoint from a configured base URL."""
-    raw = lmstudio_url.rstrip("/")
+def _chat_completions_url(base_url: str) -> str:
+    """Resolve OpenAI-compatible /v1/chat/completions from a configured base URL."""
+    raw = base_url.rstrip("/")
     if raw.endswith("/chat/completions"):
-        raw = raw[: -len("/chat/completions")]
-    if raw.endswith("/api/v1/chat"):
         return raw
     if raw.endswith("/v1"):
-        return raw[: -len("/v1")] + "/api/v1/chat"
-    if raw.endswith("/api/v1"):
-        return raw + "/chat"
-    return raw + "/api/v1/chat"
+        return raw + "/chat/completions"
+    if raw.endswith("/api/v1/chat"):
+        raw = raw[: -len("/api/v1/chat")]
+    return raw.rstrip("/") + "/v1/chat/completions"
 
 
-def _extract_response_content(body: dict) -> str:
+def _llm_settings(config) -> tuple[str, str]:
+    base_url = getattr(config, "llm_base_url", None) or config.lmstudio_url
+    model = getattr(config, "llm_model", None) or config.lmstudio_model
+    return base_url, model
+
+
+def _extract_openai_content(body: dict) -> str:
     if "error" in body:
         err = body["error"]
         message = err.get("message", err) if isinstance(err, dict) else err
         raise RuntimeError(message)
-    parts: List[str] = []
-    for item in body.get("output", []):
-        if not isinstance(item, dict):
-            continue
-        if item.get("type") == "message":
-            parts.append(str(item.get("content", "")))
-    content = "".join(parts).strip()
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise RuntimeError("Empty LLM response")
+    message = choices[0].get("message", {})
+    content = str(message.get("content", "")).strip()
     if not content:
-        raise RuntimeError("Empty LM Studio response")
+        raise RuntimeError("Empty LLM response")
     return content
 
 
-def _call_lmstudio(config, user_prompt: str, *, batch_size: int) -> dict:
-    url = _lmstudio_chat_url(config.lmstudio_url)
-    max_output_tokens = min(4096, 64 + batch_size * 80)
+def _call_llm(config, user_prompt: str, *, batch_size: int) -> dict:
+    base_url, model = _llm_settings(config)
+    url = _chat_completions_url(base_url)
+    max_tokens = min(4096, 64 + batch_size * 80)
     payload = {
-        "model": config.lmstudio_model,
-        "system_prompt": _SYSTEM_PROMPT,
-        "input": user_prompt,
+        "model": model,
+        "messages": [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
         "temperature": 0.0,
-        "max_output_tokens": max_output_tokens,
-        "reasoning": "off",
-        "store": False,
+        "max_tokens": max_tokens,
     }
     resp = httpx.post(url, json=payload, timeout=180.0)
     resp.raise_for_status()
-    content = _extract_response_content(resp.json())
+    content = _extract_openai_content(resp.json())
     return _parse_json(content)
 
 
@@ -186,7 +187,7 @@ def quality_check(
         ]
         prompt = _build_batch_prompt(batch, src, tgt)
         try:
-            verdict = _call_lmstudio(config, prompt, batch_size=len(batch))
+            verdict = _call_llm(config, prompt, batch_size=len(batch))
             _apply_batch_verdicts(batch, corrected, verdict)
         except Exception as exc:
             logger.warning(

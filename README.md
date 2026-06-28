@@ -1,6 +1,6 @@
-# DualSub
+# PolyVoice
 
-**Local dual-subtitle and dubbing pipeline for video and audio.** Transcribe speech with **Qwen3-ASR**, **Whisper**, or **Nemotron 3.5**, translate with Helsinki-NLP, **NLLB-200**, or optional LLM backends, optionally refine translations via LM Studio, and play the result in a web player with **two subtitle tracks** and **live word-by-word karaoke highlighting**. **Dubbing mode** synthesizes translated speech with Qwen3-TTS, Kokoro, VoxCPM2, OmniVoice, or an external Higgs TTS server, keeps background music via Demucs separation, and muxes dubbed audio into the video. Customize subtitle colors and fonts in the player and export. Export a high-quality burned-in MP4 when you are done.
+**Local AI pipeline for transcription, translation, subtitles and dubbing.** Transcribe speech with **Qwen3-ASR**, **Whisper**, or **Nemotron 3.5**, translate with Helsinki-NLP, **NLLB-200**, or optional LLM backends, optionally refine translations via a **local LLM** (LM Studio, Ollama, or llama.cpp), and play the result in a web player with **two subtitle tracks** and **live word-by-word karaoke highlighting**. **Dubbing mode** synthesizes translated speech with Qwen3-TTS, Kokoro, VoxCPM2, OmniVoice, or an external Higgs TTS server, separates vocals from background music early via **Demucs**, mixes dubbed speech with adjustable background level, and muxes into the video. Customize subtitle colors and fonts in the preview sidebar and export. Export a high-quality burned-in MP4 when you are done.
 
 Everything runs on your machine — no cloud API keys required for the core workflow.
 
@@ -16,11 +16,12 @@ Everything runs on your machine — no cloud API keys required for the core work
 | **Translation** | Helsinki `opus-mt`, **NLLB-200** (4 sizes), Hunyuan Hy-MT2, or TranslateGemma 4B |
 | **Subtitle styling** | Font, color, bold/italic, karaoke colors — synced to player and MP4 export |
 | **GPU memory** | ASR model is unloaded from VRAM before translation starts |
-| **Quality control** | Optional back-translation + LM Studio review in batches |
+| **Quality control** | Optional back-translation + local LLM review (LM Studio, Ollama, llama.cpp) |
 | **Player** | Dual subtitles, clickable transcript, per-word highlight sync |
 | **Export** | Burn styled subtitles into MP4 via ffmpeg (CRF 18, audio copied losslessly) |
-| **Dubbing** | TTS per cue (Qwen3-TTS, Kokoro, VoxCPM2, OmniVoice, Higgs server); Demucs background keep; preview subtitles |
-| **Model manager** | In-app Hugging Face download UI; optional HF token for gated models |
+| **Dubbing** | TTS per cue; Demucs vocal/background split (early in pipeline); adjustable background level; dubbed MP4 export |
+| **Model manager** | Nested accordion library (ASR / Translation / TTS families); optional HF token |
+| **Settings UI** | Gear icon (top-right): Voice & dubbing, ASR, Translation, Quality control accordions |
 
 Supported spoken languages depend on the ASR engine (Qwen supports a fixed set; Whisper is broader). Translation pairs depend on the backend — Helsinki requires a pre-trained `opus-mt-{src}-{tgt}` model for each direction.
 
@@ -44,7 +45,7 @@ From opening the app to downloading a subtitled video:
 
 ```mermaid
 flowchart TD
-    openApp[Open DualSub at localhost:5173] --> inputChoice{How do you add media?}
+    openApp[Open PolyVoice at localhost:5173] --> inputChoice{How do you add media?}
 
     inputChoice -->|Paste link| pasteUrl[Paste YouTube URL]
     inputChoice -->|Upload| uploadFile[Upload video or audio file]
@@ -52,30 +53,35 @@ flowchart TD
     pasteUrl --> pickLang[Select spoken language and translate-to language]
     uploadFile --> pickLang
 
-    pickLang --> optionalAdv{Open Advanced settings?}
+    pickLang --> optionalAdv{Open settings gear?}
 
-    optionalAdv -->|Yes| pickAsr[Pick ASR engine and model]
-    optionalAdv -->|Yes| pickTrans[Pick translation backend]
-    optionalAdv -->|Yes| pickStyle[Customize subtitle style]
-    optionalAdv -->|Yes| pickQc[Optional: enable QC via LM Studio]
+    optionalAdv -->|Yes| pickAsr[ASR accordion: engine and models]
+    optionalAdv -->|Yes| pickTrans[Translation accordion: backend and batch size]
+    optionalAdv -->|Yes| pickDub[Dubbing accordion: TTS, voice clone, background level]
+    optionalAdv -->|Yes| pickQc[Quality control accordion: local LLM review]
     optionalAdv -->|No| useDefaults[Use defaults: Qwen + Helsinki]
 
     pickAsr --> generate
     pickTrans --> generate
-    pickStyle --> generate
+    pickDub --> generate
     pickQc --> generate
-    useDefaults --> generate[Click Generate dual subtitles]
+    useDefaults --> generate[Click Generate]
 
     generate --> ensureModels[Download missing HF models if needed]
     ensureModels --> pipelineRuns[Backend pipeline runs]
     pipelineRuns --> watch[Watch in player with karaoke highlighting]
-    watch --> exportChoice{Export burned-in MP4?}
-    exportChoice -->|Yes| burnIn[Export and download MP4]
+    watch --> styleSidebar[Appearance sidebar: per-language font accordions]
+    styleSidebar --> exportChoice{Export?}
+    exportChoice -->|Subtitles| burnIn[Burn subtitles into MP4]
+    exportChoice -->|Dub| dubMp4[Download dubbed MP4]
     exportChoice -->|No| done([Done])
     burnIn --> done
+    dubMp4 --> done
 ```
 
-**Typical path:** paste a YouTube link or upload a file → choose **Swedish → English** (or any pair) → click **Generate** → play → optionally **Export burned-in video**.
+**Typical path:** paste a YouTube link or upload a file → choose languages → click **Generate** → play → tune **Appearance** in the right sidebar → export.
+
+**Subtitle styling** is configured after preview in the **Appearance** panel (per-language accordions for font, colors, and karaoke). Dubbing options live in the **settings gear** (top-right of the workspace), not the left job form.
 
 ### Pipeline (backend)
 
@@ -122,17 +128,29 @@ flowchart LR
 
     subgraph output [5. Output]
         qc{QC enabled?}
-        lmstudio[LM Studio review]
+        localLLM[Local LLM review]
         artifacts[cues.json + subtitles.ass]
         player[Web player]
         ffmpegExport[ffmpeg burn-in MP4]
         translated --> qc
-        qc -->|Yes| lmstudio --> artifacts
+        qc -->|Yes| localLLM --> artifacts
         qc -->|No| artifacts
         artifacts --> player
         artifacts --> ffmpegExport
     end
+
+    subgraph dub [6. Dubbing optional]
+        demucs[Demucs: separate vocals early]
+        tts[TTS timeline synthesis]
+        mix[Mix dubbed vocals + background]
+        mux[Mux dubbed audio into video]
+        media --> demucs
+        artifacts --> tts --> mix
+        demucs --> mix --> mux
+    end
 ```
+
+**Dub mode** runs Demucs **right after ingest** (before ASR) when background music is kept, so separation overlaps with transcription. Vocals are removed from the accompaniment stem; dubbed speech is mixed at `background_mix_level` (default 85%). If separation fails, the output uses dubbed vocals only (no original speaker bleed).
 
 The **spoken language** line gets real word timings from the ASR engine. The **translated** line timings are approximated by distributing each cue's duration across its words proportionally to character length.
 
@@ -156,12 +174,12 @@ Long audio (>3 min) is split internally by the forced aligner library (180 s chu
 
 ### Whisper
 
-Alternative engine via the Hugging Face `transformers` ASR pipeline. No separate forced aligner is needed — Whisper produces word timestamps directly.
+Alternative engine via the HuggingFace `transformers` ASR pipeline. No separate forced aligner is needed — Whisper produces word timestamps directly.
 
 | Setting | Options |
 |---|---|
 | Presets | `openai/whisper-small`, `openai/whisper-medium`, `openai/whisper-large-v3`, `openai/whisper-large-v3-turbo` |
-| Custom model | Any Hugging Face repo id (e.g. `KBLab/kb-whisper-large`) |
+| Custom model | Any HuggingFace repo id (e.g. `KBLab/kb-whisper-large`) |
 | Source language | ISO code passed to Whisper; omit / use auto for language detection |
 | Chunking | 30-second chunks for long audio |
 
@@ -169,7 +187,7 @@ Whisper large-v3-turbo is a faster variant of large-v3 with slightly lower accur
 
 ### Nemotron 3.5 ASR
 
-Multilingual engine via Hugging Face `AutoModelForRNNT` (`nvidia/nemotron-3.5-asr-streaming-0.6b`). The **spoken language** you select is mapped to a Nemotron locale automatically (e.g. `sv` → `sv-SE`, `tr` → `tr-TR`). Supports 40 locales in three tiers (transcription-ready, broad-coverage, adaptation-ready).
+Multilingual engine via HuggingFace `AutoModelForRNNT` (`nvidia/nemotron-3.5-asr-streaming-0.6b`). The **spoken language** you select is mapped to a Nemotron locale automatically (e.g. `sv` → `sv-SE`, `tr` → `tr-TR`). Supports 40 locales in three tiers (transcription-ready, broad-coverage, adaptation-ready).
 
 ---
 
@@ -186,11 +204,34 @@ All backends translate subtitle cues in **batches** (configurable via `translate
 
 ### Optional quality control
 
-When enabled, each translation is back-translated to the source language, then an LM Studio LLM compares the original with the back-translation and suggests corrections where meaning diverged. Requests are sent in small batches (`qc_batch_size`, default 8) to stay within context limits.
+When enabled, each translation is back-translated to the source language, then a **local LLM** compares the original with the back-translation and suggests corrections where meaning diverged. Requests are sent in small batches (`qc_batch_size`, default 8) to stay within context limits.
 
-LM Studio's native chat API is used (`POST /api/v1/chat`). A small model such as `liquid/lfm2.5-1.2b` is a reliable choice.
+Uses the **OpenAI-compatible** `POST /v1/chat/completions` API. Supported providers (select in the UI):
+
+| Provider | Default base URL | Notes |
+|---|---|---|
+| **LM Studio** | `http://localhost:1234/v1` | Load any GGUF model in LM Studio |
+| **Ollama** | `http://localhost:11434/v1` | e.g. `llama3.2` |
+| **llama.cpp server** | `http://localhost:8080/v1` | OpenAI-compatible server mode |
+
+A small instruct model (e.g. `liquid/lfm2.5-1.2b` in LM Studio) is a reliable choice.
 
 ---
+
+## Dubbing
+
+Enable **Dubbing** mode on the left panel, then open the **settings gear** → **Voice & dubbing**:
+
+| Setting | Description |
+|---|---|
+| **TTS backend** | Qwen3-TTS, Kokoro, VoxCPM2, OmniVoice, or Higgs (external server) |
+| **Voice source** | Preset speaker, clone from video, or upload reference audio |
+| **Keep background** | Demucs separates vocals; accompaniment is mixed under dubbed speech |
+| **Background level** | 0–100% mix level for separated background (music/SFX) |
+
+**Pipeline (dub):** ingest → **Demucs separation** → ASR → translate → (QC) → subtitles → TTS synthesis → mix → mux → `dubbed.mp4`
+
+Export options after preview: **Dubbed video** (audio replaced) or **Dub + subtitles** (burned-in ASS).
 
 ## Video quality
 
@@ -224,7 +265,7 @@ The source video in the player is the original downloaded/uploaded file; only th
 | **ffmpeg** | Must be on `PATH` (audio extract + subtitle burn-in) |
 | **[Deno](https://docs.deno.com/runtime/getting_started/installation/)** | Required for YouTube downloads via yt-dlp (JS challenge solving) |
 | **GPU** | NVIDIA CUDA strongly recommended (ASR + translation models are heavy) |
-| **LM Studio** | Optional — local LLM server for translation quality control |
+| **LM Studio / Ollama / llama.cpp** | Optional — local LLM for translation quality control |
 | **espeak-ng** | Required for Kokoro TTS (must be on `PATH`) |
 | **Higgs TTS server** | Optional — run SGLang-Omni or vLLM-Omni locally for Higgs dubbing |
 | **OmniVoice** | Optional — install separately: `pip install omnivoice` (voice cloning TTS) |
@@ -249,8 +290,8 @@ Only one heavy model stage runs at a time — ASR is unloaded before translation
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/g-hano/dualsub.git
-cd dualsub
+git clone https://github.com/g-hano/polyvoice.git
+cd polyvoice
 ```
 
 ### 2. Backend
@@ -291,7 +332,7 @@ Open **http://localhost:5173**. The Vite dev server proxies `/api` (including We
 
 ### 4. Download models
 
-Before your first job, open the app and click **Downloaded models**, or let the app auto-download required models when you submit a job.
+Before your first job, open the app and click **Models**, or let the app auto-download required models when you submit a job.
 
 **Default Qwen job** expects:
 
@@ -304,22 +345,45 @@ Before your first job, open the app and click **Downloaded models**, or let the 
 - `openai/whisper-large-v3` (or your chosen preset / custom model)
 - `Helsinki-NLP/opus-mt-{src}-{tgt}`
 
-Models are cached by Hugging Face Hub after the first download.
+Models are cached by HuggingFace Hub after the first download.
 
 ---
 
 ## Usage
 
-1. Paste a **YouTube URL** or **upload** a video/audio file.
-2. Select **spoken language** and **translation language**.
-3. Expand **Advanced settings** (optional):
-   - **ASR engine:** Qwen3-ASR, Whisper, or Nemotron 3.5 (+ locale for Nemotron).
-   - **Translation:** Helsinki, NLLB-200, Hunyuan, or TranslateGemma.
-   - **Subtitle appearance:** font, colors, karaoke highlight colors (applies to player and export).
-   - **Quality control:** optional LM Studio back-translate review.
-4. Click **Generate dual subtitles**. Missing models download automatically (set an optional HF token under **Downloaded models** for gated repos).
+### Left panel — job setup
+
+1. Choose **Subtitles** or **Dubbing** mode.
+2. Paste a **YouTube URL** or **upload** a video/audio file.
+3. Select **spoken language** and **translation language**.
+4. Click **Generate subtitles** or **Generate dubbed video**.
+
+### Settings gear (top-right, workspace header)
+
+Opens a popover with collapsible sections (all closed by default):
+
+| Section | Contents |
+|---|---|
+| **Voice & dubbing** | TTS engine, voice clone, background music level *(dub mode only)* |
+| **ASR** | Qwen3 / Whisper / Nemotron engine and model selection |
+| **Translation** | Helsinki, NLLB, Hunyuan, TranslateGemma; batch size |
+| **Quality control** | Optional back-translate + local LLM (provider, URL, model) |
+
+### After processing
+
 5. Play with dual subtitles and word-by-word karaoke highlighting.
-6. Click **Export burned-in video**, then **Download MP4**.
+6. **Appearance** sidebar (right): expand per-language accordions to set font, colors, and karaoke styling.
+7. Export **burned-in subtitles**, **dubbed video**, or **dub + subtitles**.
+
+### Model library
+
+Click **Models** in the header. Models are grouped in two levels:
+
+- **Speech Recognition** → Qwen3 ASR, Forced Aligner, Whisper, Nemotron, …
+- **Translation** → Helsinki opus-mt, NLLB, Hunyuan, TranslateGemma, …
+- **Text to Speech** → Qwen3 TTS variants, VoxCPM, OmniVoice, …
+
+Set an optional HuggingFace token for gated repos. Missing models auto-download when you submit a job.
 
 ---
 
@@ -335,7 +399,7 @@ Prefix: `SUBTITLE_`. Can also be set in `backend/.env`.
 | `SUBTITLE_TORCH_DTYPE` | `bfloat16` | Model dtype (`bfloat16`, `float16`, `float32`) |
 | `SUBTITLE_MOCK_MODELS` | unset | Set to `1` / `true` to run with mock ASR/translation (no GPU, for UI testing) |
 | `SUBTITLE_DATA_DIR` | `backend/data` | Job artifacts and cache directory |
-| `SUBTITLE_HF_TOKEN` / `HF_TOKEN` | unset | Optional Hugging Face token for gated model downloads |
+| `SUBTITLE_HF_TOKEN` / `HF_TOKEN` | unset | Optional HuggingFace token for gated model downloads |
 
 ### Job-level options
 
@@ -347,6 +411,7 @@ Set via the web form or `POST /api/jobs` (`multipart/form-data`):
 | `file` | — | Uploaded media file |
 | `source_lang` | `sv` | ISO 639-1 code of spoken language |
 | `target_lang` | `en` | ISO 639-1 code of translation language |
+| `job_mode` | `subtitle` | `subtitle` or `dub` |
 | `asr_engine` | `qwen` | `qwen`, `whisper`, or `nemotron` |
 | `asr_model` | `Qwen/Qwen3-ASR-1.7B` | Qwen ASR repo id |
 | `forced_aligner_model` | `Qwen/Qwen3-ForcedAligner-0.6B` | Qwen aligner repo id |
@@ -356,9 +421,16 @@ Set via the web form or `POST /api/jobs` (`multipart/form-data`):
 | `nllb_model` | `facebook/nllb-200-distilled-600M` | NLLB checkpoint when backend is `nllb` |
 | `subtitle_style` | defaults | JSON: font, colors, bold/italic per track |
 | `translate_batch_size` | `16` | Cues per translation batch (1–128) |
-| `qc_enabled` | `false` | Enable LM Studio quality control |
-| `lmstudio_url` | `http://localhost:1234/v1` | LM Studio base URL |
-| `lmstudio_model` | `local-model` | Model name loaded in LM Studio |
+| `qc_enabled` | `false` | Enable local LLM quality control |
+| `llm_provider` | `lmstudio` | `lmstudio`, `ollama`, or `llamacpp` |
+| `llm_base_url` | `http://localhost:1234/v1` | OpenAI-compatible API base URL |
+| `llm_model` | `local-model` | Model name on the local server |
+| `tts_backend` | `qwen` | `kokoro`, `qwen`, `voxcpm`, `omnivoice`, `higgs` |
+| `tts_model` | `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` | TTS model repo id |
+| `voice_mode` | `preset` | `preset`, `clone_video`, or `clone_upload` |
+| `keep_background` | `true` | Keep separated background in dub mix |
+| `background_mix_level` | `0.85` | Background stem level in final dub (0.0–1.0) |
+| `ref_audio` | — | Reference audio file for voice clone upload |
 
 ### Supported languages (UI)
 
@@ -402,6 +474,10 @@ Each job writes to `backend/data/jobs/{job_id}/`:
 | `cues.json` | Subtitle cues with word timings |
 | `subtitles.ass` | ASS file with karaoke tags |
 | `export.mp4` | Burned-in export (after export step) |
+| `dubbed_vocals.wav` | Synthesized speech only *(dub)* |
+| `accompaniment.wav` | Demucs non-vocal stem *(dub)* |
+| `dubbed_audio.wav` | Final mixed dub audio *(dub)* |
+| `dubbed.mp4` | Video with dubbed audio track *(dub)* |
 | `job.json` | Job metadata and config snapshot |
 
 ---
@@ -409,7 +485,7 @@ Each job writes to `backend/data/jobs/{job_id}/`:
 ## Project structure
 
 ```
-dualsub/
+polyvoice/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py              # FastAPI routes
@@ -422,20 +498,28 @@ dualsub/
 │   │       ├── asr.py           # Qwen, Whisper, Nemotron ASR; GPU unload
 │   │       ├── segment.py       # Word → subtitle cue segmentation
 │   │       ├── translate.py     # Helsinki / NLLB / Hunyuan / TranslateGemma
-│   │       ├── qc.py            # Optional LM Studio quality check
+│   │       ├── qc.py            # Optional local LLM quality check (OpenAI API)
+│   │       ├── audio_mix.py     # Demucs separation, dub mix, ffmpeg mux
+│   │       ├── dub.py           # TTS timeline synthesis
+│   │       ├── tts.py           # TTS engine backends
 │   │       └── subtitles.py     # Styled ASS generation, ffmpeg burn-in
 │   ├── data/jobs/               # Per-job artifacts (gitignored)
 │   ├── pyproject.toml
 │   └── requirements.txt
 ├── frontend/
 │   └── src/
-│       ├── App.tsx              # Main layout, progress, player
+│       ├── App.tsx              # Main layout, progress, player, appearance sidebar
 │       ├── api.ts               # Backend client
 │       ├── components/
-│       │   ├── JobForm.tsx      # Job creation form
+│       │   ├── JobForm.tsx      # Mode, media, languages, submit
+│       │   ├── AdvancedSettingsPanel.tsx  # Settings gear: ASR, translation, dub, QC
+│       │   ├── SubtitleSettingsPanel.tsx  # Per-language appearance accordions
 │       │   ├── Player.tsx       # Video player + subtitle overlay
-│       │   └── ModelsModal.tsx  # Model download manager + HF token
+│       │   └── ModelsModal.tsx  # Nested model library + HF token
+│       ├── utils/
+│       │   └── modelGroups.ts   # Model family grouping for Models modal
 │       └── hooks/
+│           ├── useJobForm.tsx   # Job form state
 │           └── useSubtitleStyleSettings.ts
 ├── assets/
 └── README.md
@@ -468,7 +552,13 @@ cd frontend && npm run dev
 
 ### Whisper custom model not found
 
-Enter the full Hugging Face repo id (e.g. `KBLab/kb-whisper-large`). The model manager will auto-download it on first use.
+Enter the full HuggingFace repo id (e.g. `KBLab/kb-whisper-large`). The model manager will auto-download it on first use.
+
+### Demucs separation failed (dub)
+
+- Ensure `demucs` is installed (`uv sync` in backend).
+- Mono ASR audio is duplicated to stereo before Demucs runs automatically.
+- If separation still fails, the job continues with dubbed vocals only (no original speaker mixed in).
 
 ### Export takes a long time
 
@@ -497,17 +587,23 @@ npm run build
 npm run preview
 ```
 
+
+## ToDo
+- [ ] multi project management system
+
 ---
 
 ## Acknowledgements
 
 - [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) — speech recognition and forced alignment
-- [OpenAI Whisper](https://github.com/openai/whisper) / [Hugging Face transformers](https://huggingface.co/docs/transformers) — alternative ASR engine
+- [OpenAI Whisper](https://github.com/openai/whisper) / [HuggingFace transformers](https://huggingface.co/docs/transformers) — alternative ASR engine
 - [Helsinki-NLP opus-mt](https://huggingface.co/Helsinki-NLP) — fast neural machine translation
 - [Hunyuan MT](https://huggingface.co/tencent/Hy-MT2-1.8B) — LLM translation backend
 - [TranslateGemma](https://huggingface.co/google/translategemma-4b-it) — Google instruction translation model
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — media ingestion
 - [LM Studio](https://lmstudio.ai/) — optional local LLM quality control
+- [Ollama](https://ollama.com/) — optional local LLM quality control
+- [Demucs](https://github.com/facebookresearch/demucs) — vocal/background separation for dubbing
 
 ---
 

@@ -9,6 +9,7 @@ export default function Accordion({
   defaultOpen = false,
   badge,
   variant = "card",
+  nested = false,
 }: {
   title: string;
   description?: string;
@@ -17,6 +18,7 @@ export default function Accordion({
   defaultOpen?: boolean;
   badge?: ReactNode;
   variant?: "card" | "ghost";
+  nested?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
@@ -57,7 +59,7 @@ export default function Accordion({
       </button>
       <div className="accordion-content border-t border-zinc-800/80" data-open={open}>
         <div id={panelId} className="accordion-inner">
-          <div className="space-y-4 px-4 py-4">{children}</div>
+          <div className={`space-y-4 ${nested ? "px-2 py-2" : "px-4 py-4"}`}>{children}</div>
         </div>
       </div>
     </div>

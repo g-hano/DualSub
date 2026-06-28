@@ -1,11 +1,11 @@
 {
-  "name": "dual-subtitle-frontend",
+  "name": "polyvoice-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -13,6 +13,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/node": "^26.0.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

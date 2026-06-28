@@ -1,4 +1,4 @@
-"""FastAPI application exposing the dual-subtitle pipeline."""
+"""FastAPI application exposing the PolyVoice pipeline."""
 from __future__ import annotations
 
 import asyncio
@@ -45,7 +45,7 @@ configure_hf_cache()
 suppress_hf_progress_bars()
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="DualSub")
+app = FastAPI(title="PolyVoice")
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,7 +79,7 @@ async def log_requests(request: Request, call_next):
 async def _startup() -> None:
     manager.bind_loop(asyncio.get_running_loop())
     download_manager.bind_loop(asyncio.get_running_loop())
-    logger.info("DualSub API ready")
+    logger.info("PolyVoice API ready")
 
 
 @app.get("/api/health")
@@ -309,6 +309,9 @@ async def create_job(
     hunyuan_model: str = Form("tencent/HY-MT1.5-1.8B"),
     translate_batch_size: int = Form(16),
     qc_enabled: bool = Form(False),
+    llm_provider: str = Form("lmstudio"),
+    llm_base_url: Optional[str] = Form(None),
+    llm_model: Optional[str] = Form(None),
     lmstudio_url: str = Form("http://localhost:1234/v1"),
     lmstudio_model: str = Form("local-model"),
     subtitle_style: Optional[str] = Form(None),
@@ -322,6 +325,7 @@ async def create_job(
     voice_clone_x_vector_only: bool = Form(False),
     higgs_server_url: str = Form("http://localhost:8000"),
     keep_background: bool = Form(True),
+    background_mix_level: float = Form(0.85),
     file: Optional[UploadFile] = File(None),
     ref_audio: Optional[UploadFile] = File(None),
 ) -> dict:
@@ -390,8 +394,11 @@ async def create_job(
         hunyuan_model=hunyuan_model,
         translate_batch_size=translate_batch_size,
         qc_enabled=qc_enabled,
-        lmstudio_url=lmstudio_url,
-        lmstudio_model=lmstudio_model,
+        llm_provider=llm_provider,  # type: ignore[arg-type]
+        llm_base_url=llm_base_url or lmstudio_url,
+        llm_model=llm_model or lmstudio_model,
+        lmstudio_url=llm_base_url or lmstudio_url,
+        lmstudio_model=llm_model or lmstudio_model,
         subtitle_style=_parse_subtitle_style(subtitle_style),
         tts_backend=tts_backend,  # type: ignore[arg-type]
         tts_model=tts_model,
@@ -403,6 +410,7 @@ async def create_job(
         voice_clone_x_vector_only=voice_clone_x_vector_only,
         higgs_server_url=higgs_server_url,
         keep_background=keep_background,
+        background_mix_level=background_mix_level,
     )
     job = manager.create_job(config, source_url=source_url or None)
 

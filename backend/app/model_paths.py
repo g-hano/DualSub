@@ -1,4 +1,4 @@
-"""Resolve Hugging Face repo ids to local backend copies before hub cache."""
+"""Resolve HuggingFace repo ids to local backend copies before hub cache."""
 from __future__ import annotations
 
 import logging

@@ -115,7 +115,7 @@ class JobManager:
         src, tgt = cfg.source_lang, cfg.target_lang
         job_dir = self.job_dir(job.id)
         try:
-            self._update(job, JobStatus.downloading, 0.05, "Fetching media")
+            self._update(job, JobStatus.downloading, 0.05, "Fetching Media")
             media, wav = ingest.ingest(
                 job_dir,
                 url=job.source_url,
@@ -124,15 +124,23 @@ class JobManager:
             )
             job.media_filename = media.name
 
-            self._update(job, JobStatus.transcribing, 0.25, "Transcribing audio")
+            if cfg.job_mode == "dub" and cfg.keep_background:
+                self._update(job, JobStatus.separating, 0.20, "Separating Background Audio")
+                _, _, separation_ok = audio_mix.separate_accompaniment(
+                    wav, job_dir, keep_background=True
+                )
+                if not separation_ok:
+                    job.message = "Background separation failed; output uses dubbed vocals only"
+
+            self._update(job, JobStatus.transcribing, 0.30, "Transcribing Audio")
             asr_result = asr.transcribe(wav, src, cfg)
 
-            self._update(job, JobStatus.segmenting, 0.5, "Building subtitle cues")
+            self._update(job, JobStatus.segmenting, 0.50, "Building Subtitle Cues")
             segments = segment.segment_words(asr_result.words, cfg)
 
             asr.unload()
 
-            self._update(job, JobStatus.translating, 0.6, "Translating")
+            self._update(job, JobStatus.translating, 0.60, "Translating")
             translator = translate.get_translator(
                 cfg.translator_backend,
                 nllb_model=cfg.nllb_model,
@@ -144,15 +152,15 @@ class JobManager:
             )
 
             if cfg.qc_enabled:
-                self._update(job, JobStatus.quality_check, 0.8, "Quality checking")
+                self._update(job, JobStatus.quality_check, 0.75, "Quality Checking")
                 translations = qc.quality_check(source_texts, translations, src, tgt, cfg)
 
             translations = punctuation.add_punctuation(translations)
 
-            self._update(job, JobStatus.building, 0.9, "Writing subtitles")
+            self._update(job, JobStatus.building, 0.85, "Writing Subtitles")
             cues = subtitles.build_cues(segments, translations, offset_sec=cfg.audio_offset_sec)
             job.cues = cues
-            subtitles.write_artifacts(cues, job_dir, cfg.subtitle_style)
+            subtitles.write_artifacts(cues, job_dir, cfg.subtitle_style, media_path=media)
 
             if cfg.job_mode == "dub":
                 translate.unload()
@@ -188,7 +196,7 @@ class JobManager:
                             ref_text=cfg.ref_text,
                         )
 
-                self._update(job, JobStatus.synthesizing, 0.75, "Synthesizing speech")
+                self._update(job, JobStatus.synthesizing, 0.88, "Synthesizing Speech")
                 dubbed_vocals_path = job_dir / "dubbed_vocals.wav"
                 import soundfile as sf
 
@@ -198,25 +206,21 @@ class JobManager:
                 )
                 unload_tts()
 
-                self._update(job, JobStatus.separating, 0.85, "Separating background audio")
-                accompaniment, _, separation_ok = audio_mix.separate_accompaniment(
-                    wav, job_dir, keep_background=cfg.keep_background
-                )
-                if not separation_ok and cfg.keep_background:
-                    job.message = (
-                        "Background separation failed; mixed with attenuated original audio"
+                if cfg.keep_background:
+                    accompaniment, _, _ = audio_mix.load_accompaniment(job_dir, wav)
+                else:
+                    accompaniment, _, _ = audio_mix.separate_accompaniment(
+                        wav, job_dir, keep_background=False
                     )
 
-                self._update(job, JobStatus.mixing, 0.92, "Mixing dubbed audio")
+                self._update(job, JobStatus.mixing, 0.95, "Mixing Dubbed Audio")
                 dubbed_audio_path = job_dir / "dubbed_audio.wav"
                 orig_samples = audio_mix.mono_sample_count(wav)
                 audio_mix.mix_dubbed(
                     dubbed_vocals_path,
                     accompaniment,
                     dubbed_audio_path,
-                    original_wav=wav,
                     background_level=cfg.background_mix_level,
-                    fallback_original_level=cfg.background_fallback_level,
                     pad_to_samples=orig_samples,
                 )
 
@@ -224,7 +228,7 @@ class JobManager:
                 audio_mix.mux_audio(media, dubbed_audio_path, dubbed_mp4)
                 job.dub_filename = dubbed_mp4.name
 
-            self._update(job, JobStatus.done, 1.0, "Complete")
+            self._update(job, JobStatus.done, 1.0, "Completed")
             self._persist(job)
         except Exception as exc:  # noqa: BLE001
             job.error = f"{exc}\n{traceback.format_exc()}"
@@ -261,7 +265,7 @@ class JobManager:
         if not cues:
             raise FileNotFoundError("Subtitles not generated yet.")
 
-        if job.config.job_mode == "dub" and not include_subtitles:
+        if job.config.job_mode == "dub":
             out = job_dir / "export.mp4"
             import shutil
 
@@ -270,9 +274,13 @@ class JobManager:
             self._persist(job)
             return out
 
+        play_res_x, play_res_y = subtitles.probe_video_size(media)
         ass = job_dir / "subtitles.ass"
         style = subtitle_style if subtitle_style is not None else job.config.subtitle_style
-        ass.write_text(subtitles.build_ass(cues, style), encoding="utf-8")
+        ass.write_text(
+            subtitles.build_ass(cues, style, play_res_x=play_res_x, play_res_y=play_res_y),
+            encoding="utf-8",
+        )
         out = job_dir / "export.mp4"
         subtitles.burn_in(media, ass, out)
         job.export_filename = out.name

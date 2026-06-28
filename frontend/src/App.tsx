@@ -19,6 +19,7 @@ import { AdvancedSettingsToolbar } from "./components/AdvancedSettingsPanel";
 import ModelsModal from "./components/ModelsModal";
 import Player from "./components/Player";
 import Accordion from "./components/ui/Accordion";
+import SlidePanel from "./components/ui/SlidePanel";
 import SubtitleSettingsPanel from "./components/SubtitleSettingsPanel";
 import Button from "./components/ui/Button";
 import Alert from "./components/ui/Alert";
@@ -28,34 +29,97 @@ import type { Cue, CreateJobParams, JobFormSubmitParams, ProgressEvent } from ".
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Queued",
-  downloading: "Fetching media",
-  extracting: "Extracting audio",
+  downloading: "Fetching Media",
+  extracting: "Extracting Audio",
   transcribing: "Transcribing",
-  segmenting: "Building cues",
+  segmenting: "Building Cues",
   translating: "Translating",
-  quality_check: "Quality check (LM Studio)",
-  building: "Writing subtitles",
-  synthesizing: "Synthesizing speech",
-  separating: "Separating background",
-  mixing: "Mixing dubbed audio",
+  quality_check: "Quality Check",
+  building: "Writing Subtitles",
+  synthesizing: "Synthesizing Speech",
+  separating: "Separating Background",
+  mixing: "Mixing Dubbed Audio",
   done: "Done",
   error: "Error",
 };
 
-const PIPELINE_STEPS = [
-  "pending",
-  "downloading",
-  "extracting",
-  "transcribing",
-  "segmenting",
-  "translating",
-  "quality_check",
-  "building",
-  "synthesizing",
-  "separating",
-  "mixing",
-  "done",
-];
+function pipelineSteps(params: CreateJobParams | null): string[] {
+  const steps = ["pending", "downloading"];
+  if (params?.jobMode === "dub" && params.keepBackground) {
+    steps.push("separating");
+  }
+  steps.push("transcribing", "segmenting", "translating");
+  if (params?.qcEnabled) steps.push("quality_check");
+  steps.push("building");
+  if (params?.jobMode === "dub") {
+    steps.push("synthesizing", "mixing");
+  }
+  steps.push("done");
+  return steps;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function interpolateColor(from: string, to: string, t: number): string {
+  const clamped = Math.min(Math.max(t, 0), 1);
+  const [r1, g1, b1] = hexToRgb(from);
+  const [r2, g2, b2] = hexToRgb(to);
+  const r = Math.round(r1 + (r2 - r1) * clamped);
+  const g = Math.round(g1 + (g2 - g1) * clamped);
+  const b = Math.round(b1 + (b2 - b1) * clamped);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+const PROGRESS_INDIGO = "#6366f1";
+const PROGRESS_EMERALD = "#10b981";
+
+function progressGreenness(
+  stepIdx: number,
+  workStepCount: number,
+  status: string,
+  pct: number
+): number {
+  if (status === "done") return 1;
+  if (stepIdx < 0 || workStepCount <= 0) return 0;
+  const stepBase = stepIdx / workStepCount;
+  const stepBoost = pct / 100 / workStepCount;
+  return Math.min(stepBase + stepBoost, 0.99);
+}
+
+function progressBarFill(
+  stepIdx: number,
+  workStepCount: number,
+  isError: boolean,
+  status: string,
+  pct: number
+): string {
+  if (isError) return "#ef4444";
+  const t = progressGreenness(stepIdx, workStepCount, status, pct);
+  if (status === "done") return PROGRESS_EMERALD;
+  return interpolateColor(PROGRESS_INDIGO, PROGRESS_EMERALD, t);
+}
+
+function progressPillColor(
+  i: number,
+  stepIdx: number,
+  workStepCount: number,
+  isError: boolean,
+  status: string,
+  pct: number
+): string {
+  if (isError) return "bg-zinc-800/60 text-zinc-600";
+  if (i < stepIdx) return "bg-emerald-500/20 text-emerald-300";
+  if (i === stepIdx) {
+    const t = progressGreenness(stepIdx, workStepCount, status, pct);
+    if (t >= 0.55) return "bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-500/40";
+    if (t >= 0.3) return "bg-teal-500/30 text-teal-200 ring-1 ring-teal-500/40";
+    return "bg-indigo-500/30 text-indigo-200 ring-1 ring-indigo-500/40";
+  }
+  return "bg-zinc-800/60 text-zinc-600";
+}
 
 function translatorModelName(params: CreateJobParams, jobRepos: string[] = []): string {
   switch (params.translatorBackend) {
@@ -116,8 +180,8 @@ export default function App() {
   const [cues, setCues] = useState<Cue[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportingSubs, setExportingSubs] = useState(false);
   const [exportReady, setExportReady] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(true);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsWatchIds, setModelsWatchIds] = useState<string[]>([]);
   const [modelPrepMessage, setModelPrepMessage] = useState<string | null>(null);
@@ -195,19 +259,17 @@ export default function App() {
     if (exportReady) setExportReady(false);
   }, [styleSettings]);
 
-  const handleExport = async (includeSubtitles = false) => {
+  const handleExport = async () => {
     if (!jobId) return;
-    if (includeSubtitles) setExportingSubs(true);
-    else setExporting(true);
+    setExporting(true);
     setError(null);
     try {
-      await requestExport(jobId, styleSettings, includeSubtitles);
+      await requestExport(jobId, styleSettings, false);
       setExportReady(true);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setExporting(false);
-      setExportingSubs(false);
     }
   };
 
@@ -230,9 +292,9 @@ export default function App() {
               <IconPlay className="h-4 w-4 text-indigo-400" />
             </div>
             <div>
-              <h1 className="text-sm font-semibold leading-none text-zinc-100">DualSub</h1>
+              <h1 className="text-sm font-semibold leading-none text-zinc-100">PolyVoice</h1>
               <p className="mt-0.5 hidden text-[11px] text-zinc-500 sm:block">
-                Transcribe · Translate · Dub
+                Local AI Pipeline for Transcription, Translation, Subtitles and Dubbing
               </p>
             </div>
           </div>
@@ -249,7 +311,7 @@ export default function App() {
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${backendOk ? "bg-emerald-400" : "bg-amber-400 animate-pulse-ring"}`}
                 />
-                {backendOk ? "Backend online" : "Backend offline"}
+                {backendOk ? "Backend Online" : "Backend Offline"}
               </span>
             )}
             <Button
@@ -334,27 +396,34 @@ export default function App() {
 
             {cues && jobId ? (
               <div className="flex flex-1 flex-col gap-5">
-                <Player src={mediaUrl(jobId)} cues={cues} style={styleSettings} />
+                <Player
+                  src={mediaUrl(jobId)}
+                  cues={cues}
+                  style={styleSettings}
+                  showSubtitles={!isDubJob}
+                />
 
-                <div className="xl:hidden">
-                  <Accordion
-                    title="Subtitle appearance"
-                    description="Font, colors, and karaoke styling for preview and export"
-                    icon={<IconSettings className="h-4 w-4" />}
-                    defaultOpen
-                  >
-                    <SubtitleSettingsPanel
-                      settings={styleSettings}
-                      fonts={fonts}
-                      onSourceChange={updateSource}
-                      onTargetChange={updateTarget}
-                      onReset={resetStyle}
-                      sourceLabel={sourceLabel}
-                      targetLabel={targetLabel}
-                      embedded
-                    />
-                  </Accordion>
-                </div>
+                {!isDubJob && (
+                  <div className="xl:hidden">
+                    <Accordion
+                      title="Subtitle appearance"
+                      description="Font, colors, and karaoke styling for preview and export"
+                      icon={<IconSettings className="h-4 w-4" />}
+                      defaultOpen={false}
+                    >
+                      <SubtitleSettingsPanel
+                        settings={styleSettings}
+                        fonts={fonts}
+                        onSourceChange={updateSource}
+                        onTargetChange={updateTarget}
+                        onReset={resetStyle}
+                        sourceLabel={sourceLabel}
+                        targetLabel={targetLabel}
+                        embedded
+                      />
+                    </Accordion>
+                  </div>
+                )}
 
                 {/* Export toolbar */}
                 <div className="mt-auto rounded-xl border border-border bg-[var(--panel-bg)] p-4">
@@ -362,35 +431,20 @@ export default function App() {
                     Export
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
-                    {isDubJob ? (
-                      <>
-                        <Button
-                          variant="secondary"
-                          icon={<IconDownload />}
-                          onClick={() => handleExport(false)}
-                          disabled={exporting || exportingSubs}
-                        >
-                          {exporting ? "Preparing…" : "Dubbed video"}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          icon={<IconDownload />}
-                          onClick={() => handleExport(true)}
-                          disabled={exporting || exportingSubs}
-                        >
-                          {exportingSubs ? "Burning…" : "Dub + subtitles"}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        icon={<IconDownload />}
-                        onClick={() => handleExport(false)}
-                        disabled={exporting}
-                      >
-                        {exporting ? "Burning…" : "Burned-in video"}
-                      </Button>
-                    )}
+                    <Button
+                      variant="secondary"
+                      icon={<IconDownload />}
+                      onClick={handleExport}
+                      disabled={exporting}
+                    >
+                      {exporting
+                        ? isDubJob
+                          ? "Preparing…"
+                          : "Burning…"
+                        : isDubJob
+                          ? "Dubbed Video"
+                          : "Burned-in Video"}
+                    </Button>
                     {exportReady && (
                       <a
                         href={exportDownloadUrl(jobId)}
@@ -409,29 +463,25 @@ export default function App() {
             </div>
           </div>
 
-          {cues && (
-            <aside className="w-full shrink-0 border-t border-border bg-[var(--panel-bg)] xl:w-[340px] xl:border-l xl:border-t-0 xl:max-h-[calc(100vh-3.5rem)] 2xl:w-[360px]">
-              <div className="flex h-full min-h-0 flex-col overflow-y-auto px-5 py-5">
-                <div className="mb-4 shrink-0">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Appearance
-                  </h2>
-                  <p className="mt-1 text-sm text-zinc-400">
-                    Subtitle styling for preview & export
-                  </p>
-                </div>
-                <SubtitleSettingsPanel
-                  settings={styleSettings}
-                  fonts={fonts}
-                  onSourceChange={updateSource}
-                  onTargetChange={updateTarget}
-                  onReset={resetStyle}
-                  sourceLabel={sourceLabel}
-                  targetLabel={targetLabel}
-                  embedded
-                />
-              </div>
-            </aside>
+          {cues && !isDubJob && (
+            <SlidePanel
+              open={appearanceOpen}
+              onToggle={() => setAppearanceOpen((v) => !v)}
+              title="Appearance"
+              description="Subtitle styling for preview & export"
+              width={340}
+            >
+              <SubtitleSettingsPanel
+                settings={styleSettings}
+                fonts={fonts}
+                onSourceChange={updateSource}
+                onTargetChange={updateTarget}
+                onReset={resetStyle}
+                sourceLabel={sourceLabel}
+                targetLabel={targetLabel}
+                embedded
+              />
+            </SlidePanel>
           )}
         </div>
       </div>
@@ -455,9 +505,9 @@ function EmptyWorkspace() {
       </p>
       <div className="mt-8 grid max-w-md grid-cols-3 gap-4 text-left">
         {[
-          { n: "1", t: "Add source", d: "URL or file upload" },
-          { n: "2", t: "Pick languages", d: "Source and target" },
-          { n: "3", t: "Generate", d: "Watch live preview" },
+          { n: "1", t: "Add Source", d: "URL or file upload" },
+          { n: "2", t: "Pick Languages", d: "Source and Target" },
+          { n: "3", t: "Generate", d: "Watch Live Preview" },
         ].map((item) => (
           <div key={item.n} className="rounded-lg border border-border bg-[var(--panel-bg)] p-3">
             <span className="text-xs font-bold text-indigo-400">{item.n}</span>
@@ -481,30 +531,45 @@ function ProgressPanel({
 }) {
   const pct = Math.round(progress.progress * 100);
   const isError = progress.status === "error";
-  const stepIdx = PIPELINE_STEPS.indexOf(progress.status);
+  const steps = pipelineSteps(params);
+  const stepIdx = steps.indexOf(progress.status);
+  const workStepCount = steps.filter((s) => s !== "done").length;
+  const greenness = progressGreenness(stepIdx, workStepCount, progress.status, pct);
+  const barFill = progressBarFill(stepIdx, workStepCount, isError, progress.status, pct);
 
   return (
     <div className="mb-5 rounded-xl border border-border bg-[var(--panel-bg)] p-5">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
+          <p
+            className="text-xs font-semibold uppercase tracking-wider"
+            style={{ color: isError ? "#f87171" : interpolateColor(PROGRESS_INDIGO, PROGRESS_EMERALD, greenness) }}
+          >
             Processing
           </p>
           <p className="mt-1 text-base font-medium text-zinc-100">
             {statusLabel(progress.status, params, jobRepos)}
           </p>
         </div>
-        <span className="rounded-lg bg-zinc-800 px-2.5 py-1 font-mono text-sm text-zinc-300">
+        <span
+          className={`rounded-lg px-2.5 py-1 font-mono text-sm ${isError ? "bg-zinc-800 text-zinc-300" : ""}`}
+          style={
+            isError
+              ? undefined
+              : {
+                  backgroundColor: `color-mix(in srgb, ${barFill} 15%, transparent)`,
+                  color: barFill,
+                }
+          }
+        >
           {pct}%
         </span>
       </div>
 
       <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
         <div
-          className={`relative h-full rounded-full transition-all duration-500 ${
-            isError ? "bg-red-500" : "bg-indigo-500"
-          }`}
-          style={{ width: `${pct}%` }}
+          className="relative h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, backgroundColor: barFill }}
         >
           {!isError && (
             <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -514,16 +579,10 @@ function ProgressPanel({
 
       {stepIdx >= 0 && (
         <div className="mt-4 flex flex-wrap gap-1.5">
-          {PIPELINE_STEPS.filter((s) => s !== "done" && s !== "error").map((s, i) => (
+          {steps.filter((s) => s !== "done" && s !== "error").map((s, i) => (
             <span
               key={s}
-              className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${
-                i < stepIdx
-                  ? "bg-indigo-500/20 text-indigo-300"
-                  : i === stepIdx
-                    ? "bg-indigo-500/30 text-indigo-200 ring-1 ring-indigo-500/40"
-                    : "bg-zinc-800/60 text-zinc-600"
-              }`}
+              className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${progressPillColor(i, stepIdx, workStepCount, isError, progress.status, pct)}`}
             >
               {STATUS_LABEL[s] ?? s}
             </span>
