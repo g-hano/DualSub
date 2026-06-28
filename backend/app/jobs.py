@@ -14,7 +14,7 @@ from typing import Dict, List, Optional
 
 from .config import PipelineConfig, is_qwen_voice_clone_model, settings
 from .models import Cue, Job, JobStatus
-from .pipeline import asr, dub, ingest, qc, segment, subtitles, translate
+from .pipeline import asr, dub, ingest, punctuation, qc, segment, subtitles, translate
 from .pipeline import audio_mix, voice_ref
 from .pipeline.tts import unload_tts
 
@@ -147,8 +147,10 @@ class JobManager:
                 self._update(job, JobStatus.quality_check, 0.8, "Quality checking")
                 translations = qc.quality_check(source_texts, translations, src, tgt, cfg)
 
+            translations = punctuation.add_punctuation(translations)
+
             self._update(job, JobStatus.building, 0.9, "Writing subtitles")
-            cues = subtitles.build_cues(segments, translations)
+            cues = subtitles.build_cues(segments, translations, offset_sec=cfg.audio_offset_sec)
             job.cues = cues
             subtitles.write_artifacts(cues, job_dir, cfg.subtitle_style)
 
@@ -187,17 +189,35 @@ class JobManager:
 
                 self._update(job, JobStatus.synthesizing, 0.75, "Synthesizing speech")
                 dubbed_vocals_path = job_dir / "dubbed_vocals.wav"
-                dub.synthesize_timeline(cues, cfg, ref, dubbed_vocals_path)
+                import soundfile as sf
+
+                media_duration = float(sf.info(str(wav)).duration)
+                dub.synthesize_timeline(
+                    cues, cfg, ref, dubbed_vocals_path, media_duration=media_duration
+                )
                 unload_tts()
 
                 self._update(job, JobStatus.separating, 0.85, "Separating background audio")
-                accompaniment, _ = audio_mix.separate_accompaniment(
+                accompaniment, _, separation_ok = audio_mix.separate_accompaniment(
                     wav, job_dir, keep_background=cfg.keep_background
                 )
+                if not separation_ok and cfg.keep_background:
+                    job.message = (
+                        "Background separation failed; mixed with attenuated original audio"
+                    )
 
                 self._update(job, JobStatus.mixing, 0.92, "Mixing dubbed audio")
                 dubbed_audio_path = job_dir / "dubbed_audio.wav"
-                audio_mix.mix_dubbed(dubbed_vocals_path, accompaniment, dubbed_audio_path)
+                orig_samples = audio_mix.mono_sample_count(wav)
+                audio_mix.mix_dubbed(
+                    dubbed_vocals_path,
+                    accompaniment,
+                    dubbed_audio_path,
+                    original_wav=wav,
+                    background_level=cfg.background_mix_level,
+                    fallback_original_level=cfg.background_fallback_level,
+                    pad_to_samples=orig_samples,
+                )
 
                 dubbed_mp4 = job_dir / "dubbed.mp4"
                 audio_mix.mux_audio(media, dubbed_audio_path, dubbed_mp4)

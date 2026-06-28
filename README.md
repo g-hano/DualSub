@@ -152,6 +152,8 @@ Best choice when you want the highest-quality word alignment for karaoke highlig
 
 Use matching `-hf` variants together when selecting HF weight layouts.
 
+Long audio (>3 min) is split internally by the forced aligner library (180 s chunks with timestamp offsets applied automatically). `max_inference_batch_size=1` is used because each job transcribes one file — this is not the same as cutting attention context mid-utterance.
+
 ### Whisper
 
 Alternative engine via the Hugging Face `transformers` ASR pipeline. No separate forced aligner is needed — Whisper produces word timestamps directly.

@@ -38,8 +38,10 @@ from .config import (
 from .jobs import manager
 from .logging_config import setup_logging, suppress_hf_progress_bars
 from .model_downloads import download_manager, repos_for_job
+from .model_paths import configure_hf_cache
 
 setup_logging()
+configure_hf_cache()
 suppress_hf_progress_bars()
 logger = logging.getLogger(__name__)
 

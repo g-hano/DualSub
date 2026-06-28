@@ -20,6 +20,7 @@ from ..config import (
     settings,
 )
 from ..logging_config import suppress_hf_progress_bars
+from ..model_paths import resolve_hf_model_path
 from .voice_ref import VoiceReference
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ class KokoroEngine(TtsEngine):
 class QwenEngine(TtsEngine):
     def __init__(self, model_id: str) -> None:
         self._model_id = model_id
+        self._load_path = resolve_hf_model_path(model_id)
         self._model = None
         self._lock = threading.Lock()
         self._is_design = "VoiceDesign" in model_id
@@ -142,10 +144,10 @@ class QwenEngine(TtsEngine):
             }
             try:
                 kwargs["attn_implementation"] = "flash_attention_2"
-                self._model = Qwen3TTSModel.from_pretrained(self._model_id, **kwargs)
+                self._model = Qwen3TTSModel.from_pretrained(self._load_path, **kwargs)
             except Exception:
                 kwargs.pop("attn_implementation", None)
-                self._model = Qwen3TTSModel.from_pretrained(self._model_id, **kwargs)
+                self._model = Qwen3TTSModel.from_pretrained(self._load_path, **kwargs)
 
     def _clone_kwargs(self, voice: VoiceConfig) -> dict:
         if voice.ref is None:
@@ -238,7 +240,9 @@ class VoxCPMEngine(TtsEngine):
             from voxcpm import VoxCPM
 
             suppress_hf_progress_bars()
-            self._model = VoxCPM.from_pretrained(VOXCPM_MODEL, load_denoiser=False)
+            self._model = VoxCPM.from_pretrained(
+                resolve_hf_model_path(VOXCPM_MODEL), load_denoiser=False
+            )
 
     def synthesize(self, text: str, voice: VoiceConfig) -> tuple[np.ndarray, int]:
         self._ensure()
@@ -282,7 +286,7 @@ class OmniVoiceEngine(TtsEngine):
             suppress_hf_progress_bars()
             dtype = torch.float16
             self._model = OmniVoice.from_pretrained(
-                OMNIVOICE_MODEL,
+                resolve_hf_model_path(OMNIVOICE_MODEL),
                 device_map=settings.device,
                 dtype=dtype,
             )

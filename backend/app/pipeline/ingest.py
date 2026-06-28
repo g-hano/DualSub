@@ -116,25 +116,60 @@ def save_upload(src_path: Path, dest_dir: Path, filename: str) -> Path:
     return dest
 
 
+def _probe_audio_start_offset(media_path: Path) -> float:
+    """Return audio stream start_time offset in seconds (0 if unknown)."""
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return 0.0
+    cmd = [
+        ffprobe,
+        "-v",
+        "error",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=start_time",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(media_path),
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        return 0.0
+    try:
+        offset = float(proc.stdout.strip())
+        if offset > 0.01:
+            logger.info("Audio stream start offset: %.3fs", offset)
+        return max(0.0, offset)
+    except ValueError:
+        return 0.0
+
+
 def extract_audio(media_path: Path, dest_dir: Path) -> Path:
     """Extract a 16kHz mono WAV from any media file."""
     ffmpeg = _require_ffmpeg()
     dest_dir.mkdir(parents=True, exist_ok=True)
     wav_path = dest_dir / "audio.wav"
-    cmd = [
-        ffmpeg,
-        "-y",
-        "-i",
-        str(media_path),
-        "-vn",
-        "-ac",
-        "1",
-        "-ar",
-        "16000",
-        "-f",
-        "wav",
-        str(wav_path),
-    ]
+    offset = _probe_audio_start_offset(media_path)
+    cmd = [ffmpeg, "-y"]
+    if offset > 0.01:
+        cmd.extend(["-ss", str(offset)])
+    cmd.extend(
+        [
+            "-i",
+            str(media_path),
+            "-vn",
+            "-async",
+            "1",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-f",
+            "wav",
+            str(wav_path),
+        ]
+    )
     logger.info("Extracting 16 kHz mono audio from %s", media_path.name)
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:

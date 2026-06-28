@@ -13,6 +13,7 @@ from typing import Dict, List
 
 from ..config import language_name, settings
 from ..logging_config import suppress_hf_progress_bars
+from ..model_paths import resolve_hf_model_path
 
 # TranslateGemma uses regional codes for some languages (e.g. de-DE, en-US).
 TRANSLATEGEMMA_LANG_CODES: dict[str, str] = {
@@ -214,15 +215,16 @@ class _CausalLMTranslator(Translator):
 
             suppress_hf_progress_bars()
             dtype = getattr(torch, settings.torch_dtype, torch.bfloat16)
+            model_path = resolve_hf_model_path(self.model_path)
             self._tokenizer = AutoTokenizer.from_pretrained(
-                self.model_path, trust_remote_code=True
+                model_path, trust_remote_code=True
             )
             # Decoder-only models require left padding for correct batched generation.
             self._tokenizer.padding_side = "left"
             if self._tokenizer.pad_token_id is None:
                 self._tokenizer.pad_token = self._tokenizer.eos_token
             self._model = AutoModelForCausalLM.from_pretrained(
-                self.model_path,
+                model_path,
                 dtype=dtype,
                 device_map="auto",
                 trust_remote_code=True,
@@ -271,7 +273,7 @@ class HunyuanTranslator(Translator):
                 f"{model_path} is a GGUF checkpoint for llama.cpp and cannot be loaded "
                 "with transformers. Choose a safetensors model (e.g. Hy-MT2-1.8B or Hy-MT2-7B)."
             )
-        self.model_path = model_path
+        self.model_path = resolve_hf_model_path(model_path)
         self._model = None
         self._tokenizer = None
         self._lock = threading.Lock()
@@ -370,7 +372,7 @@ class NllbTranslator(Translator):
     """Uses facebook/nllb-200 models via AutoModelForSeq2SeqLM."""
 
     def __init__(self, model_path: str) -> None:
-        self.model_path = model_path
+        self.model_path = resolve_hf_model_path(model_path)
         self._model = None
         self._tokenizer = None
         self._lock = threading.Lock()

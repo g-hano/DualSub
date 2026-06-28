@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional
 
-from huggingface_hub import HfApi, scan_cache_dir, snapshot_download, try_to_load_from_cache
-from huggingface_hub.errors import LocalEntryNotFoundError
+from huggingface_hub import HfApi, scan_cache_dir, snapshot_download
 
 from .config import OMNIVOICE_MODEL, QWEN_TTS_TOKENIZER, VOXCPM_MODEL, settings
+from .model_paths import is_hf_model_available
 
 
 class ModelCategory(str, Enum):
@@ -374,11 +374,7 @@ def _cache_size_bytes(repo_id: str) -> int:
 
 
 def is_model_cached(repo_id: str) -> bool:
-    try:
-        path = try_to_load_from_cache(repo_id, "config.json", repo_type="model")
-        return path is not None
-    except (LocalEntryNotFoundError, Exception):
-        return False
+    return is_hf_model_available(repo_id)
 
 
 def _make_tqdm(reporter: DownloadState, file_index: int, file_total: int):

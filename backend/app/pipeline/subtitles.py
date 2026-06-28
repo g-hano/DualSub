@@ -40,18 +40,30 @@ def _approx_target_words(text: str, start: float, end: float) -> List[Word]:
     return words
 
 
-def build_cues(segments: List[Segment], translations: List[str]) -> List[Cue]:
+def build_cues(
+    segments: List[Segment],
+    translations: List[str],
+    *,
+    offset_sec: float = 0.0,
+) -> List[Cue]:
     cues: List[Cue] = []
     for idx, (seg, translation) in enumerate(zip(segments, translations)):
+        start = round(seg.start + offset_sec, 3)
+        end = round(seg.end + offset_sec, 3)
         source_words = [
-            Word(w=w.w, start=round(w.start, 3), end=round(w.end, 3)) for w in seg.words
+            Word(
+                w=w.w,
+                start=round(w.start + offset_sec, 3),
+                end=round(w.end + offset_sec, 3),
+            )
+            for w in seg.words
         ]
-        target_words = _approx_target_words(translation, seg.start, seg.end)
+        target_words = _approx_target_words(translation, start, end)
         cues.append(
             Cue(
                 id=idx,
-                start=round(seg.start, 3),
-                end=round(seg.end, 3),
+                start=start,
+                end=end,
                 source=Line(text=seg.text, words=source_words),
                 target=Line(text=translation, words=target_words),
             )
@@ -89,15 +101,22 @@ def _ass_font_size(px: int) -> int:
     return max(18, round(px * ASS_FONT_SCALE))
 
 
+def _opacity_to_ass_alpha(opacity: float) -> int:
+    """Map 0..1 opacity to ASS alpha byte (0=opaque, 255=transparent)."""
+    return int((1.0 - max(0.0, min(1.0, opacity))) * 255)
+
+
 def _track_style_line(name: str, track: TrackStyle, margin_v: int) -> str:
     primary = _hex_to_ass_color(track.color)
     karaoke = _hex_to_ass_color(track.karaoke_active_color)
+    back_alpha = _opacity_to_ass_alpha(track.background_opacity)
+    back_colour = f"&H{back_alpha:02X}000000"
     bold = -1 if track.bold else 0
     italic = -1 if track.italic else 0
     fontsize = _ass_font_size(track.font_size)
     return (
         f"Style: {name},{track.font_family},{fontsize},{primary},{karaoke},"
-        f"&H00000000,&H64000000,{bold},{italic},0,0,100,100,0,0,1,3,1,2,80,80,{margin_v},1"
+        f"&H00000000,{back_colour},{bold},{italic},0,0,100,100,0,0,1,3,1,2,80,80,{margin_v},1"
     )
 
 

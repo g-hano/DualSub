@@ -7,23 +7,23 @@ const STORAGE_KEY = "subtitle-style-settings";
 
 export const DEFAULT_TRACK: TrackStyle = {
   font_family: "Arial",
-  font_size: 20,
+  font_size: 14,
   color: "#FFFFFF",
   bold: true,
   italic: false,
   karaoke_active_color: "#FFD24A",
   karaoke_done_color: "#B9C6FF",
-  background_opacity: 0.55,
+  background_opacity: 0.25,
 };
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyleSettings = {
-  source: { ...DEFAULT_TRACK, background_opacity: 0.55 },
+  source: { ...DEFAULT_TRACK, background_opacity: 0.25 },
   target: {
     ...DEFAULT_TRACK,
     color: "#A7F3D0",
     bold: false,
     italic: true,
-    background_opacity: 0.45,
+    background_opacity: 0.25,
   },
 };
 

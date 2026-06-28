@@ -76,4 +76,56 @@ def segment_words(words: List[AsrWord], config) -> List[Segment]:
     if current.words:
         segments.append(current)
 
-    return [s for s in segments if s.words]
+    return merge_short_segments([s for s in segments if s.words], config)
+
+
+def merge_short_segments(segments: List[Segment], config) -> List[Segment]:
+    """Merge adjacent short segments split by pause gaps during slow speech."""
+    if not segments:
+        return segments
+
+    merged: List[Segment] = []
+    current = segments[0]
+
+    for nxt in segments[1:]:
+        gap = nxt.start - current.end
+        combined_text = (current.text + " " + nxt.text).strip()
+        combined_dur = nxt.end - current.start
+        ends_sentence = _ends_sentence(current.words[-1].w)
+        can_merge = (
+            not ends_sentence
+            and gap < config.merge_gap
+            and len(combined_text) <= config.max_cue_chars
+            and combined_dur <= config.max_cue_duration
+        )
+        if can_merge:
+            current.words.extend(nxt.words)
+        else:
+            merged.append(current)
+            current = nxt
+    merged.append(current)
+
+    min_dur = getattr(config, "min_cue_duration", 1.0)
+    if min_dur <= 0:
+        return merged
+
+    result: List[Segment] = []
+    i = 0
+    while i < len(merged):
+        seg = merged[i]
+        dur = seg.end - seg.start
+        if dur < min_dur and i + 1 < len(merged):
+            nxt = merged[i + 1]
+            combined_text = (seg.text + " " + nxt.text).strip()
+            combined_dur = nxt.end - seg.start
+            if (
+                len(combined_text) <= config.max_cue_chars
+                and combined_dur <= config.max_cue_duration
+            ):
+                combined = Segment(words=seg.words + nxt.words)
+                result.append(combined)
+                i += 2
+                continue
+        result.append(seg)
+        i += 1
+    return result

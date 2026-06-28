@@ -373,7 +373,10 @@ class PipelineConfig(BaseModel):
     # Segmentation tuning.
     max_cue_chars: int = 84
     max_cue_duration: float = 6.0
-    pause_gap: float = 0.6
+    pause_gap: float = 1.2
+    merge_gap: float = 1.5
+    min_cue_duration: float = 1.0
+    audio_offset_sec: float = 0.0
 
     # Dubbing / TTS
     job_mode: Literal["subtitle", "dub"] = "subtitle"
@@ -387,6 +390,8 @@ class PipelineConfig(BaseModel):
     voice_clone_x_vector_only: bool = False
     higgs_server_url: str = "http://localhost:8000"
     keep_background: bool = True
+    background_mix_level: float = Field(0.85, ge=0.0, le=1.0)
+    background_fallback_level: float = Field(0.3, ge=0.0, le=1.0)
 
     def helsinki_model(self, src: str, tgt: str) -> str:
         from .helsinki_models import resolve_helsinki_repo
@@ -406,6 +411,10 @@ class Settings(BaseSettings):
     hf_token: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("HF_TOKEN", "SUBTITLE_HF_TOKEN", "hf_token"),
+    )
+    hf_home: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("HF_HOME", "SUBTITLE_HF_HOME", "hf_home"),
     )
 
     @property

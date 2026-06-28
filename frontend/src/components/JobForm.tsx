@@ -151,6 +151,11 @@ export default function JobForm({
       setTtsModel(ttsMeta.qwen_models[0].repo_id);
     }
     setVoiceMode(defaultVoiceMode(backend, nextModel));
+    if (backend === "kokoro") {
+      setVoiceId("af_heart");
+    } else if (backend === "qwen") {
+      setVoiceId("Ryan");
+    }
   };
 
   const handleTtsModelChange = (modelId: string) => {
@@ -160,6 +165,7 @@ export default function JobForm({
       setVoiceMode("clone_video");
     } else if (kind === "custom_voice") {
       setVoiceMode("preset");
+      setVoiceId("Ryan");
     }
   };
 
@@ -262,6 +268,12 @@ export default function JobForm({
 
       {jobMode === "dub" && (
         <div className="space-y-4 rounded-xl border border-white/10 bg-ink/40 p-4">
+          {isVoiceDesign && (
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+              VoiceDesign can vary between lines. For more consistent dubbing, use CustomVoice or
+              voice clone instead.
+            </p>
+          )}
           <div>
             <Label>TTS engine</Label>
             <select

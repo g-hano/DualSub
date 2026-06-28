@@ -18,6 +18,7 @@ from typing import List, Optional
 
 from ..config import language_name, nemotron_locale, settings
 from ..logging_config import suppress_hf_progress_bars
+from ..model_paths import resolve_hf_model_path
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,12 @@ def _torch_dtype():
 
 
 def _load_qwen_model(asr_model: str, aligner_model: str):
-    """Load and cache the Qwen3ASRModel with the forced aligner attached."""
+    """Load and cache the Qwen3ASRModel with the forced aligner attached.
+
+    ``max_inference_batch_size=1`` because each job transcribes a single file.
+    Batching multiple chunks in one forward pass is handled internally by
+    qwen-asr when long audio is split for the forced aligner (180 s chunks).
+    """
     global _model
     if _model is not None:
         return _model
@@ -65,12 +71,12 @@ def _load_qwen_model(asr_model: str, aligner_model: str):
         suppress_hf_progress_bars()
         dtype = _torch_dtype()
         _model = Qwen3ASRModel.from_pretrained(
-            asr_model,
+            resolve_hf_model_path(asr_model),
             dtype=dtype,
             device_map=settings.device,
-            max_inference_batch_size=8,
-            max_new_tokens=2048,
-            forced_aligner=aligner_model,
+            max_inference_batch_size=1,
+            max_new_tokens=4096,
+            forced_aligner=resolve_hf_model_path(aligner_model),
             forced_aligner_kwargs=dict(
                 dtype=dtype,
                 device_map=settings.device,
@@ -93,7 +99,7 @@ def _load_whisper_model(whisper_model: str):
         device = 0 if settings.device.startswith("cuda") else -1
         _whisper = pipeline(
             "automatic-speech-recognition",
-            model=whisper_model,
+            model=resolve_hf_model_path(whisper_model),
             dtype=_torch_dtype(),
             device=device,
         )
@@ -111,9 +117,10 @@ def _load_nemotron_model(nemotron_model: str):
         from transformers import AutoModelForRNNT, AutoProcessor
 
         suppress_hf_progress_bars()
-        processor = AutoProcessor.from_pretrained(nemotron_model)
+        nemotron_path = resolve_hf_model_path(nemotron_model)
+        processor = AutoProcessor.from_pretrained(nemotron_path)
         model = AutoModelForRNNT.from_pretrained(
-            nemotron_model,
+            nemotron_path,
             dtype=_torch_dtype(),
             device_map="auto",
         )
@@ -142,9 +149,47 @@ def unload() -> None:
     logger.info("Unloaded ASR model from memory")
 
 
+def _iter_timestamp_items(time_stamps):
+    """Yield aligner items from ForcedAlignResult or plain iterables."""
+    if time_stamps is None:
+        yield from ()
+        return
+    items = getattr(time_stamps, "items", None)
+    if items is not None:
+        for item in items:
+            yield item
+        return
+    if isinstance(time_stamps, dict) and "items" in time_stamps:
+        for item in time_stamps["items"]:
+            yield item
+        return
+    if hasattr(time_stamps, "__iter__") and not isinstance(time_stamps, (str, bytes)):
+        for item in time_stamps:
+            yield item
+
+
+def _fix_word_timestamps(words: List[AsrWord]) -> List[AsrWord]:
+    """Clamp negatives and log non-monotonic jumps."""
+    fixed: List[AsrWord] = []
+    prev_end = 0.0
+    for w in words:
+        start = max(0.0, float(w.start))
+        end = max(start, float(w.end))
+        if fixed and start < prev_end - 0.1:
+            logger.warning(
+                "Non-monotonic ASR timestamp for %r: %.3fs (previous end %.3fs)",
+                w.w,
+                start,
+                prev_end,
+            )
+        fixed.append(AsrWord(w=w.w, start=round(start, 3), end=round(end, 3)))
+        prev_end = end
+    return fixed
+
+
 def _coerce_words(time_stamps) -> List[AsrWord]:
     words: List[AsrWord] = []
-    for ts in time_stamps or []:
+    for ts in _iter_timestamp_items(time_stamps):
         text = getattr(ts, "text", None)
         start = getattr(ts, "start_time", None)
         end = getattr(ts, "end_time", None)
@@ -158,7 +203,39 @@ def _coerce_words(time_stamps) -> List[AsrWord]:
         if not token:
             continue
         words.append(AsrWord(w=token, start=float(start), end=float(end)))
-    return words
+    return _fix_word_timestamps(words)
+
+
+def _qwen_max_new_tokens(duration_sec: float) -> int:
+    """Scale token budget with audio length so long files are not truncated."""
+    return max(4096, min(16384, int(duration_sec * 8)))
+
+
+def _log_timestamp_diagnostics(words: List[AsrWord], wav_path: Path) -> None:
+    duration = _audio_duration(wav_path)
+    logger.info("ASR diagnostics: %d words, audio %.2fs", len(words), duration)
+    if not words:
+        return
+    logger.info(
+        "ASR timestamp range: %.3fs – %.3fs (last word ends %.3fs)",
+        words[0].start,
+        words[-1].end,
+        words[-1].end,
+    )
+    if duration > 0 and words[-1].end < duration * 0.5:
+        logger.warning(
+            "ASR last timestamp (%.2fs) is far below audio duration (%.2fs) — "
+            "transcript may have been truncated",
+            words[-1].end,
+            duration,
+        )
+    window = [w for w in words if 25.0 <= w.start <= 35.0]
+    if window:
+        sample = ", ".join(f"{w.w}@{w.start:.2f}s" for w in window[:10])
+        logger.info("ASR words at 25–35s: %s", sample)
+    boundary = [w for w in words if 29.0 <= w.start <= 31.0]
+    for w in boundary:
+        logger.info("ASR near 30s boundary: %r @ %.3fs", w.w, w.start)
 
 
 def transcribe(wav_path: Path, source_lang: str, config) -> AsrResult:
@@ -176,6 +253,9 @@ def transcribe(wav_path: Path, source_lang: str, config) -> AsrResult:
 
 def _transcribe_qwen(wav_path: Path, source_lang: str, config) -> AsrResult:
     model = _load_qwen_model(config.asr_model, config.forced_aligner_model)
+    duration = _audio_duration(wav_path)
+    model.max_new_tokens = _qwen_max_new_tokens(duration)
+    logger.info("Qwen ASR max_new_tokens=%d for %.1fs audio", model.max_new_tokens, duration)
     results = model.transcribe(
         audio=str(wav_path),
         language=language_name(source_lang),
@@ -183,6 +263,7 @@ def _transcribe_qwen(wav_path: Path, source_lang: str, config) -> AsrResult:
     )
     r = results[0]
     words = _coerce_words(getattr(r, "time_stamps", None))
+    _log_timestamp_diagnostics(words, wav_path)
     text = getattr(r, "text", "") or " ".join(w.w for w in words)
     return AsrResult(language=getattr(r, "language", None), text=text, words=words)
 
