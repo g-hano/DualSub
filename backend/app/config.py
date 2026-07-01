@@ -187,13 +187,13 @@ def nemotron_tier(source_lang: str) -> str | None:
 
 
 HUNYUAN_MODELS: list[dict[str, str]] = [
-    {"repo_id": "tencent/HY-MT1.5-1.8B", "label": "HY-MT1.5-1.8B (fast, recommended)"},
+    {"repo_id": "tencent/Hy-MT2-1.8B", "label": "Hy-MT2-1.8B (recommended)"},
+    {"repo_id": "tencent/HY-MT1.5-1.8B", "label": "HY-MT1.5-1.8B (fast)"},
     {"repo_id": "tencent/HY-MT1.5-1.8B-FP8", "label": "HY-MT1.5-1.8B FP8"},
     {"repo_id": "tencent/HY-MT1.5-1.8B-GPTQ-Int4", "label": "HY-MT1.5-1.8B GPTQ Int4"},
     {"repo_id": "tencent/HY-MT1.5-7B", "label": "HY-MT1.5-7B"},
     {"repo_id": "tencent/HY-MT1.5-7B-FP8", "label": "HY-MT1.5-7B FP8"},
     {"repo_id": "tencent/HY-MT1.5-7B-GPTQ-Int4", "label": "HY-MT1.5-7B GPTQ Int4"},
-    {"repo_id": "tencent/Hy-MT2-1.8B", "label": "Hy-MT2-1.8B (recommended Hy-MT2)"},
     {"repo_id": "tencent/Hy-MT2-1.8B-FP8", "label": "Hy-MT2-1.8B FP8"},
     {"repo_id": "tencent/Hy-MT2-7B", "label": "Hy-MT2-7B"},
     {"repo_id": "tencent/Hy-MT2-7B-FP8", "label": "Hy-MT2-7B FP8"},
@@ -358,9 +358,9 @@ class PipelineConfig(BaseModel):
     whisper_model: str = "openai/whisper-large-v3"
     nemotron_model: str = "nvidia/nemotron-3.5-asr-streaming-0.6b"
 
-    translator_backend: Literal["helsinki", "hunyuan", "translategemma", "nllb"] = "helsinki"
+    translator_backend: Literal["helsinki", "hunyuan", "translategemma", "nllb"] = "hunyuan"
     nllb_model: str = "facebook/nllb-200-distilled-600M"
-    hunyuan_model: str = "tencent/HY-MT1.5-1.8B"
+    hunyuan_model: str = "tencent/Hy-MT2-1.8B"
     translate_batch_size: int = Field(16, ge=1, le=128, description="Cues per translation batch")
 
     qc_enabled: bool = False

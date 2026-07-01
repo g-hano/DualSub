@@ -120,7 +120,7 @@ class EnsureJobModelsRequest(BaseModel):
     whisper_model: str = "openai/whisper-large-v3"
     nemotron_model: str = "nvidia/nemotron-3.5-asr-streaming-0.6b"
     nllb_model: str = "facebook/nllb-200-distilled-600M"
-    hunyuan_model: str = "tencent/HY-MT1.5-1.8B"
+    hunyuan_model: str = "tencent/Hy-MT2-1.8B"
     job_mode: str = "subtitle"
     tts_backend: str = "qwen"
     tts_model: str = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
@@ -304,9 +304,9 @@ async def create_job(
     forced_aligner_model: str = Form("Qwen/Qwen3-ForcedAligner-0.6B"),
     whisper_model: str = Form("openai/whisper-large-v3"),
     nemotron_model: str = Form("nvidia/nemotron-3.5-asr-streaming-0.6b"),
-    translator_backend: str = Form("helsinki"),
+    translator_backend: str = Form("hunyuan"),
     nllb_model: str = Form("facebook/nllb-200-distilled-600M"),
-    hunyuan_model: str = Form("tencent/HY-MT1.5-1.8B"),
+    hunyuan_model: str = Form("tencent/Hy-MT2-1.8B"),
     translate_batch_size: int = Form(16),
     qc_enabled: bool = Form(False),
     llm_provider: str = Form("lmstudio"),

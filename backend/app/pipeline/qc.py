@@ -169,7 +169,7 @@ def quality_check(
     back_translator = get_translator(
         config.translator_backend,
         nllb_model=getattr(config, "nllb_model", "facebook/nllb-200-distilled-600M"),
-        hunyuan_model=getattr(config, "hunyuan_model", "tencent/HY-MT1.5-1.8B"),
+        hunyuan_model=getattr(config, "hunyuan_model", "tencent/Hy-MT2-1.8B"),
     )
     back_translations = back_translator.translate(
         translations, tgt, src, batch_size=getattr(config, "translate_batch_size", 16)

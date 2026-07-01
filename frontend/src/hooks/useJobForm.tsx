@@ -15,9 +15,9 @@ import type {
 const CUSTOM_WHISPER = "__custom__";
 
 export const TRANSLATION_BACKENDS = [
-  { id: "helsinki", label: "Helsinki opus-mt (fast, recommended)" },
+  { id: "hunyuan", label: "Hunyuan Hy-MT2 (recommended)" },
+  { id: "helsinki", label: "Helsinki opus-mt (fast)" },
   { id: "nllb", label: "NLLB-200 (multilingual)" },
-  { id: "hunyuan", label: "Hunyuan (HY-MT1.5 / Hy-MT2)" },
   { id: "translategemma", label: "TranslateGemma 4B" },
 ];
 
@@ -111,11 +111,11 @@ function useJobFormState(onSubmit: (params: JobFormSubmitParams) => void, busy: 
   const [nemotronModel, setNemotronModel] = useState("nvidia/nemotron-3.5-asr-streaming-0.6b");
   const [whisperPreset, setWhisperPreset] = useState("openai/whisper-large-v3");
   const [whisperCustom, setWhisperCustom] = useState("");
-  const [translatorBackend, setTranslatorBackend] = useState("helsinki");
+  const [translatorBackend, setTranslatorBackend] = useState("hunyuan");
   const [nllbModels, setNllbModels] = useState<AsrModelOption[]>([]);
   const [nllbModel, setNllbModel] = useState("facebook/nllb-200-distilled-600M");
   const [hunyuanModels, setHunyuanModels] = useState<AsrModelOption[]>([]);
-  const [hunyuanModel, setHunyuanModel] = useState("tencent/HY-MT1.5-1.8B");
+  const [hunyuanModel, setHunyuanModel] = useState("tencent/Hy-MT2-1.8B");
   const [translateBatchSize, setTranslateBatchSize] = useState(16);
   const [qcEnabled, setQcEnabled] = useState(false);
   const [llmProvider, setLlmProvider] = useState<LlmProvider>("lmstudio");

@@ -123,7 +123,7 @@ MODEL_REGISTRY: List[ModelEntry] = [
         repo_id="tencent/HY-MT1.5-1.8B",
         label="Hunyuan HY-MT1.5-1.8B",
         category=ModelCategory.translation,
-        description="Tencent Hunyuan 1.8B translation model (recommended).",
+        description="Tencent Hunyuan 1.8B translation model.",
     ),
     ModelEntry(
         id="hunyuan-mt1.5-1.8b-fp8",
@@ -165,7 +165,7 @@ MODEL_REGISTRY: List[ModelEntry] = [
         repo_id="tencent/Hy-MT2-1.8B",
         label="Hunyuan Hy-MT2-1.8B",
         category=ModelCategory.translation,
-        description="Tencent Hy-MT2 1.8B fast-thinking translation model.",
+        description="Tencent Hy-MT2 1.8B fast-thinking translation model (default).",
     ),
     ModelEntry(
         id="hunyuan-mt2-1.8b-fp8",
@@ -310,7 +310,7 @@ def repos_for_job(
     whisper_model: str = "openai/whisper-large-v3",
     nemotron_model: str = "nvidia/nemotron-3.5-asr-streaming-0.6b",
     nllb_model: str = "facebook/nllb-200-distilled-600M",
-    hunyuan_model: str = "tencent/HY-MT1.5-1.8B",
+    hunyuan_model: str = "tencent/Hy-MT2-1.8B",
     job_mode: str = "subtitle",
     tts_backend: str = "qwen",
     tts_model: str = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",

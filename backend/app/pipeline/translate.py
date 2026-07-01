@@ -1,7 +1,7 @@
 """Pluggable translation backends.
 
-Default: Helsinki-NLP opus-mt models (one model per direction).
-Optional: Hunyuan, TranslateGemma, and NLLB-200.
+Default: Hunyuan Hy-MT2-1.8B.
+Optional: Helsinki-NLP opus-mt, NLLB-200, TranslateGemma.
 
 All backends are cached per direction and loaded lazily.
 """
@@ -267,7 +267,7 @@ class _CausalLMTranslator(Translator):
 class HunyuanTranslator(Translator):
     """Tencent Hunyuan MT models (HY-MT1.5 / Hy-MT2)."""
 
-    def __init__(self, model_path: str = "tencent/HY-MT1.5-1.8B") -> None:
+    def __init__(self, model_path: str = "tencent/Hy-MT2-1.8B") -> None:
         if "GGUF" in model_path.upper():
             raise ValueError(
                 f"{model_path} is a GGUF checkpoint for llama.cpp and cannot be loaded "
@@ -435,7 +435,7 @@ _INSTANCES_LOCK = threading.Lock()
 def get_translator(
     backend: str,
     nllb_model: str = "facebook/nllb-200-distilled-600M",
-    hunyuan_model: str = "tencent/HY-MT1.5-1.8B",
+    hunyuan_model: str = "tencent/Hy-MT2-1.8B",
 ) -> Translator:
     if settings.mock_models:
         return MockTranslator()
