@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SubtitleStyleSettings } from "../hooks/useSubtitleStyleSettings";
 import type { Cue } from "../types";
 import SubtitleOverlay from "./SubtitleOverlay";
@@ -41,6 +42,7 @@ export default function Player({
   style: SubtitleStyleSettings;
   showSubtitles?: boolean;
 }) {
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
   const [transcriptOpen, setTranscriptOpen] = useState(true);
@@ -62,6 +64,10 @@ export default function Player({
   const seek = (t: number) => {
     if (videoRef.current) videoRef.current.currentTime = t;
   };
+
+  const transcriptToggleLabel = transcriptOpen
+    ? t("player.hideTranscript")
+    : t("player.showTranscript");
 
   return (
     <div className="flex flex-1 flex-col gap-4 xl:flex-row xl:items-start">
@@ -85,7 +91,7 @@ export default function Player({
           </div>
         </div>
         <p className="mt-2 text-center text-xs text-zinc-600">
-          {cues.length} subtitle cues · click transcript to seek
+          {t("player.cueCount", { count: cues.length })}
         </p>
       </div>
 
@@ -94,8 +100,8 @@ export default function Player({
           type="button"
           onClick={() => setTranscriptOpen((v) => !v)}
           aria-expanded={transcriptOpen}
-          aria-label={transcriptOpen ? "Hide transcript" : "Show transcript"}
-          title={transcriptOpen ? "Hide transcript" : "Show transcript"}
+          aria-label={transcriptToggleLabel}
+          title={transcriptToggleLabel}
           className="absolute top-6 z-20 flex h-10 w-7 items-center justify-center rounded-r-lg border border-border bg-[var(--panel-bg)] text-zinc-400 shadow-md transition-all duration-300 ease-in-out hover:bg-zinc-800 hover:text-zinc-200"
           style={{ left: transcriptOpen ? -28 : 0 }}
         >
@@ -113,8 +119,8 @@ export default function Player({
             style={{ width: TRANSCRIPT_WIDTH }}
           >
             <div className="border-b border-border px-4 py-3">
-              <h3 className="text-sm font-medium text-zinc-200">Transcript</h3>
-              <p className="text-xs text-zinc-500">{cues.length} lines</p>
+              <h3 className="text-sm font-medium text-zinc-200">{t("player.transcript")}</h3>
+              <p className="text-xs text-zinc-500">{t("player.lines", { count: cues.length })}</p>
             </div>
             <Transcript cues={cues} activeIndex={activeIndex} style={style} onSeek={seek} />
           </div>
@@ -124,8 +130,8 @@ export default function Player({
       <div className="w-full shrink-0 xl:hidden">
         <div className="flex max-h-[28rem] flex-col overflow-hidden rounded-xl border border-border bg-[var(--panel-bg)]">
           <div className="border-b border-border px-4 py-3">
-            <h3 className="text-sm font-medium text-zinc-200">Transcript</h3>
-            <p className="text-xs text-zinc-500">{cues.length} lines</p>
+            <h3 className="text-sm font-medium text-zinc-200">{t("player.transcript")}</h3>
+            <p className="text-xs text-zinc-500">{t("player.lines", { count: cues.length })}</p>
           </div>
           <Transcript cues={cues} activeIndex={activeIndex} style={style} onSeek={seek} />
         </div>

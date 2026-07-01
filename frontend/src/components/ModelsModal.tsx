@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   downloadModel,
   downloadRequiredModels,
@@ -21,13 +22,6 @@ import {
   subgroupSummary,
 } from "../utils/modelGroups";
 
-const STATUS_LABEL: Record<string, string> = {
-  not_downloaded: "Not downloaded",
-  downloaded: "Downloaded",
-  downloading: "Downloading…",
-  error: "Error",
-};
-
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return "—";
   const units = ["B", "KB", "MB", "GB"];
@@ -49,10 +43,16 @@ export default function ModelsModal({
   onClose: () => void;
   watchModelIds?: string[];
 }) {
+  const { t, i18n } = useTranslation();
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const unsubRef = useRef<Map<string, () => void>>(new Map());
+
+  const statusLabel = (status: string) => {
+    const key = `models.${status}`;
+    return i18n.exists(key) ? t(key) : status;
+  };
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -117,7 +117,7 @@ export default function ModelsModal({
     setModels((prev) =>
       prev.map((m) =>
         m.id === modelId
-          ? { ...m, status: "downloading", progress: 0, message: "Starting…", error: null }
+          ? { ...m, status: "downloading", progress: 0, message: t("models.starting"), error: null }
           : m
       )
     );
@@ -142,7 +142,7 @@ export default function ModelsModal({
         setModels((prev) =>
           prev.map((m) =>
             started.includes(m.id)
-              ? { ...m, status: "downloading", progress: 0, message: "Starting…" }
+              ? { ...m, status: "downloading", progress: 0, message: t("models.starting") }
               : m
           )
         );
@@ -198,18 +198,16 @@ export default function ModelsModal({
             </span>
             <div>
               <h2 id="models-modal-title" className="text-lg font-semibold text-zinc-100">
-                Model Library
+                {t("models.title")}
               </h2>
-              <p className="mt-0.5 text-sm text-zinc-500">
-                Download HuggingFace models before running jobs
-              </p>
+              <p className="mt-0.5 text-sm text-zinc-500">{t("models.subtitle")}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200"
-            aria-label="Close"
+            aria-label={t("common.close")}
           >
             ✕
           </button>
@@ -221,7 +219,7 @@ export default function ModelsModal({
 
         <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-3">
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-            {loading ? "Refreshing…" : "Refresh"}
+            {loading ? t("common.refreshing") : t("common.refresh")}
           </Button>
           {requiredMissing && (
             <Button
@@ -230,7 +228,7 @@ export default function ModelsModal({
               onClick={handleDownloadRequired}
               disabled={anyDownloading}
             >
-              Download required
+              {t("models.downloadRequired")}
             </Button>
           )}
         </div>
@@ -243,7 +241,7 @@ export default function ModelsModal({
 
         <div className="max-h-[min(60vh,520px)] overflow-y-auto px-6 py-4">
           {loading && models.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-500">Loading models…</p>
+            <p className="py-8 text-center text-sm text-zinc-500">{t("models.loading")}</p>
           ) : (
             <div className="space-y-2">
               {CATEGORY_ORDER.map((category) => {
@@ -270,7 +268,7 @@ export default function ModelsModal({
                           nested
                           badge={
                             subgroup.models.some((m) => m.required && m.status !== "downloaded") ? (
-                              <Badge variant="warning">Required</Badge>
+                              <Badge variant="warning">{t("common.required")}</Badge>
                             ) : undefined
                           }
                         >
@@ -280,6 +278,7 @@ export default function ModelsModal({
                                 key={model.id}
                                 model={model}
                                 onDownload={() => handleDownload(model.id)}
+                                statusLabel={statusLabel}
                               />
                             ))}
                           </ul>
@@ -300,10 +299,13 @@ export default function ModelsModal({
 function ModelRow({
   model,
   onDownload,
+  statusLabel,
 }: {
   model: ModelInfo;
   onDownload: () => void;
+  statusLabel: (status: string) => string;
 }) {
+  const { t } = useTranslation();
   const pct = Math.round(model.progress * 100);
   const isDownloaded = model.status === "downloaded";
   const isDownloading = model.status === "downloading";
@@ -315,19 +317,19 @@ function ModelRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-zinc-100">{model.label}</span>
-            {model.required && <Badge variant="warning">Required</Badge>}
-            <StatusBadge status={model.status} />
+            {model.required && <Badge variant="warning">{t("common.required")}</Badge>}
+            <StatusBadge status={model.status} statusLabel={statusLabel} />
           </div>
           <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-600">{model.repo_id}</p>
           <p className="mt-1.5 text-sm text-zinc-400">{model.description}</p>
           <p className="mt-1 text-xs text-zinc-600">
-            {formatBytes(model.size_on_disk)} on disk
+            {t("models.onDisk", { size: formatBytes(model.size_on_disk) })}
           </p>
         </div>
 
         {!isDownloaded && !isDownloading && (
           <Button variant="outline" size="sm" onClick={onDownload} className="shrink-0">
-            Download
+            {t("common.download")}
           </Button>
         )}
       </div>
@@ -335,7 +337,7 @@ function ModelRow({
       {(isDownloading || isDownloaded) && (
         <div className="mt-3">
           <div className="mb-1 flex justify-between text-xs text-zinc-500">
-            <span>{STATUS_LABEL[model.status] ?? model.status}</span>
+            <span>{statusLabel(model.status)}</span>
             <span className="font-mono">{pct}%</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
@@ -364,7 +366,13 @@ function ModelRow({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+  status,
+  statusLabel,
+}: {
+  status: string;
+  statusLabel: (status: string) => string;
+}) {
   const variantMap: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
     not_downloaded: "default",
     downloaded: "success",
@@ -373,12 +381,13 @@ function StatusBadge({ status }: { status: string }) {
   };
   return (
     <Badge variant={variantMap[status] ?? "default"}>
-      {STATUS_LABEL[status] ?? status}
+      {statusLabel(status)}
     </Badge>
   );
 }
 
 function HfTokenSection() {
+  const { t } = useTranslation();
   const [auth, setAuth] = useState<HfAuthStatus | null>(null);
   const [tokenInput, setTokenInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -425,25 +434,27 @@ function HfTokenSection() {
 
   const statusText = auth?.configured
     ? auth.source === "env"
-      ? `Using token from environment${auth.username ? ` (${auth.username})` : ""}`
-      : `Logged in as ${auth.username ?? "HF user"}`
-    : "Not authenticated — public models only";
+      ? t("models.hfTokenEnv", {
+          username: auth.username ? ` (${auth.username})` : "",
+        })
+      : t("models.hfTokenLoggedIn", { username: auth.username ?? "HF user" })
+    : t("models.hfTokenNotAuth");
 
   return (
     <div className="rounded-xl border border-border bg-[var(--panel-bg)] p-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-zinc-200">HuggingFace token</p>
+        <p className="text-sm font-medium text-zinc-200">{t("models.hfToken")}</p>
         <span className="text-xs text-zinc-500">{statusText}</span>
       </div>
       <p className="mb-3 text-xs text-zinc-500">
-        Required for gated models.{" "}
+        {t("models.hfTokenHint")}{" "}
         <a
           href="https://huggingface.co/settings/tokens"
           target="_blank"
           rel="noreferrer"
           className="text-indigo-400 hover:underline"
         >
-          Get a token →
+          {t("models.hfTokenLink")}
         </a>
       </p>
       <div className="flex flex-wrap gap-2">
@@ -451,15 +462,15 @@ function HfTokenSection() {
           type="password"
           value={tokenInput}
           onChange={(e) => setTokenInput(e.target.value)}
-          placeholder="hf_…"
+          placeholder={t("models.hfTokenPlaceholder")}
           autoComplete="off"
           className="min-w-[200px] flex-1"
         />
         <Button variant="primary" onClick={save} disabled={busy || !tokenInput.trim()}>
-          Save
+          {t("common.save")}
         </Button>
         <Button variant="outline" onClick={clear} disabled={busy || !auth?.configured}>
-          Clear
+          {t("common.clear")}
         </Button>
       </div>
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}

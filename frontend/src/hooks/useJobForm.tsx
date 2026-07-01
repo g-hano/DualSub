@@ -15,33 +15,24 @@ import type {
 const CUSTOM_WHISPER = "__custom__";
 
 export const TRANSLATION_BACKENDS = [
-  { id: "hunyuan", label: "Hunyuan Hy-MT2 (recommended)" },
-  { id: "helsinki", label: "Helsinki opus-mt (fast)" },
-  { id: "nllb", label: "NLLB-200 (multilingual)" },
-  { id: "translategemma", label: "TranslateGemma 4B" },
-];
+  { id: "hunyuan" },
+  { id: "helsinki" },
+  { id: "nllb" },
+  { id: "translategemma" },
+] as const;
 
-export const TTS_BACKEND_LABELS: Record<TtsBackend, string> = {
-  qwen: "Qwen3-TTS",
-  kokoro: "Kokoro",
-  voxcpm: "VoxCPM2",
-  omnivoice: "OmniVoice",
-  higgs: "Higgs TTS (external server)",
-};
+export const TTS_BACKEND_IDS: TtsBackend[] = ["qwen", "kokoro", "voxcpm", "omnivoice", "higgs"];
 
 export const LLM_PROVIDER_PRESETS = {
   lmstudio: {
-    label: "LM Studio",
     url: "http://localhost:1234/v1",
     model: "local-model",
   },
   ollama: {
-    label: "Ollama",
     url: "http://localhost:11434/v1",
     model: "llama3.2",
   },
   llamacpp: {
-    label: "llama.cpp server",
     url: "http://localhost:8080/v1",
     model: "",
   },

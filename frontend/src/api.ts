@@ -4,6 +4,7 @@ import type {
   CreateJobParams,
   HfAuthStatus,
   JobInfo,
+  JobListItem,
   ModelInfo,
   ModelProgressEvent,
   ProgressEvent,
@@ -156,10 +157,23 @@ export async function createJob(params: CreateJobParams): Promise<{ job_id: stri
   return res.json();
 }
 
-export async function getJob(jobId: string): Promise<JobInfo> {
-  const res = await apiFetch(`${API}/jobs/${jobId}`);
+export async function listJobs(): Promise<JobListItem[]> {
+  const res = await apiFetch(`${API}/jobs`);
+  if (!res.ok) throw new Error("Failed to load projects");
+  const data = await res.json();
+  return data.jobs ?? [];
+}
+
+export async function getJob(jobId: string, includeCues = false): Promise<JobInfo> {
+  const query = includeCues ? "?include_cues=true" : "";
+  const res = await apiFetch(`${API}/jobs/${jobId}${query}`);
   if (!res.ok) throw new Error("Job not found");
   return res.json();
+}
+
+export async function deleteJob(jobId: string): Promise<void> {
+  const res = await apiFetch(`${API}/jobs/${jobId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await readApiError(res));
 }
 
 export async function getCues(jobId: string): Promise<Cue[]> {

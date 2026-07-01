@@ -47,10 +47,55 @@ export interface JobInfo {
   progress: number;
   message: string;
   error?: string | null;
+  source_url?: string | null;
   media_filename?: string | null;
   export_filename?: string | null;
   dub_filename?: string | null;
-  config?: { job_mode?: JobMode };
+  config?: JobConfig;
+  cues?: Cue[];
+}
+
+export interface JobListItem {
+  id: string;
+  status: JobStatus;
+  created_at: number;
+  source_url?: string | null;
+  media_filename?: string | null;
+  mode: JobMode;
+  label: string;
+}
+
+export interface JobConfig {
+  job_mode?: JobMode;
+  source_lang?: string;
+  target_lang?: string;
+  asr_engine?: AsrEngine;
+  asr_model?: string;
+  forced_aligner_model?: string;
+  whisper_model?: string;
+  nemotron_model?: string;
+  translator_backend?: string;
+  nllb_model?: string;
+  hunyuan_model?: string;
+  translate_batch_size?: number;
+  qc_enabled?: boolean;
+  llm_provider?: LlmProvider;
+  llm_base_url?: string;
+  llm_model?: string;
+  lmstudio_url?: string;
+  lmstudio_model?: string;
+  subtitle_style?: SubtitleStyleSettings;
+  tts_backend?: TtsBackend;
+  tts_model?: string;
+  voice_mode?: VoiceMode;
+  voice_id?: string;
+  voice_design_instruct?: string;
+  voice_instruct?: string;
+  ref_text?: string;
+  voice_clone_x_vector_only?: boolean;
+  higgs_server_url?: string;
+  keep_background?: boolean;
+  background_mix_level?: number;
 }
 
 export type AsrEngine = "qwen" | "whisper" | "nemotron";

@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Alert from "./ui/Alert";
 import Accordion from "./ui/Accordion";
 import Input, { FileInput, Textarea } from "./ui/Input";
 import Select from "./ui/Select";
 import SegmentedControl from "./ui/SegmentedControl";
+import ToggleSwitch from "./ui/ToggleSwitch";
 import { IconDub, IconGlobe, IconMic, IconQualityCheck, IconSettings } from "./ui/Icons";
 import {
   CUSTOM_WHISPER_VALUE,
   LLM_PROVIDER_PRESETS,
-  TTS_BACKEND_LABELS,
+  TTS_BACKEND_IDS,
   TRANSLATION_BACKENDS,
   useJobForm,
 } from "../hooks/useJobForm";
 import type { AsrModelOption, LlmProvider, TtsBackend } from "../types";
 
 export function AdvancedSettingsToolbar() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +38,7 @@ export function AdvancedSettingsToolbar() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label="Advanced settings"
+        aria-label={t("advancedSettings.ariaLabel")}
         className={`group relative flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
           open
             ? "border border-indigo-500/50 bg-indigo-500/20 text-indigo-300 ring-2 ring-indigo-500/40"
@@ -49,7 +52,7 @@ export function AdvancedSettingsToolbar() {
         role="tooltip"
         className="pointer-events-none absolute right-0 top-[calc(100%+6px)] z-50 max-w-[220px] whitespace-normal rounded-md border border-border bg-zinc-900 px-2.5 py-1.5 text-xs leading-snug text-zinc-300 opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
       >
-        Voice & dubbing, ASR, translation & quality control
+        {t("advancedSettings.tooltip")}
       </div>
 
       {open && (
@@ -61,15 +64,50 @@ export function AdvancedSettingsToolbar() {
   );
 }
 
+function LanguageSwitch() {
+  const { i18n, t } = useTranslation();
+  const isTr = i18n.language === "tr";
+
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-zinc-950/40 px-3 py-2.5">
+      <span className="text-sm font-medium text-zinc-300">{t("language.ui")}</span>
+      <div className="flex items-center gap-2.5">
+        <span
+          className={`min-w-[1.25rem] text-center text-xs font-semibold tracking-wide transition-colors ${
+            !isTr ? "text-zinc-100" : "text-zinc-500"
+          }`}
+        >
+          {t("language.en")}
+        </span>
+        <ToggleSwitch
+          checked={isTr}
+          onChange={(checked) => i18n.changeLanguage(checked ? "tr" : "en")}
+          aria-label={isTr ? t("language.tr") : t("language.en")}
+        />
+        <span
+          className={`min-w-[1.25rem] text-center text-xs font-semibold tracking-wide transition-colors ${
+            isTr ? "text-zinc-100" : "text-zinc-500"
+          }`}
+        >
+          {t("language.tr")}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function AdvancedSettingsFields() {
+  const { t } = useTranslation();
   const f = useJobForm();
 
   return (
     <div className="space-y-2">
+      <LanguageSwitch />
+
       {f.jobMode === "dub" && (
         <Accordion
-          title="Voice & dubbing"
-          description="TTS Engine, Voice Cloning, Background Audio"
+          title={t("advancedSettings.voiceDubbing")}
+          description={t("advancedSettings.voiceDubbingDesc")}
           icon={<IconDub className="h-4 w-4" />}
           defaultOpen={false}
           variant="ghost"
@@ -79,8 +117,8 @@ function AdvancedSettingsFields() {
       )}
 
       <Accordion
-        title="ASR"
-        description="Speech Recognition Engine and Models"
+        title={t("advancedSettings.asr")}
+        description={t("advancedSettings.asrDesc")}
         icon={<IconMic className="h-4 w-4" />}
         defaultOpen={false}
         variant="ghost"
@@ -89,8 +127,8 @@ function AdvancedSettingsFields() {
       </Accordion>
 
       <Accordion
-        title="Translation"
-        description="Translation Engine, Models, and Batch Size"
+        title={t("advancedSettings.translation")}
+        description={t("advancedSettings.translationDesc")}
         icon={<IconGlobe className="h-4 w-4" />}
         defaultOpen={false}
         variant="ghost"
@@ -99,8 +137,8 @@ function AdvancedSettingsFields() {
       </Accordion>
 
       <Accordion
-        title="Quality control"
-        description="Back-translate review with a Local LLM"
+        title={t("advancedSettings.qualityControl")}
+        description={t("advancedSettings.qualityControlDesc")}
         icon={<IconQualityCheck className="h-4 w-4" />}
         defaultOpen={false}
         variant="ghost"
@@ -112,31 +150,29 @@ function AdvancedSettingsFields() {
 }
 
 function VoiceDubbingFields() {
+  const { t } = useTranslation();
   const f = useJobForm();
 
   return (
     <div className="space-y-4">
       {f.isVoiceDesign && (
-        <Alert variant="warning">
-          VoiceDesign can vary between lines. For more consistent dubbing, use CustomVoice or voice
-          clone instead.
-        </Alert>
+        <Alert variant="warning">{t("advancedSettings.voiceDesignWarning")}</Alert>
       )}
       <Select
-        label="TTS engine"
+        label={t("advancedSettings.ttsEngine")}
         value={f.ttsBackend}
         onChange={(e) => f.handleTtsBackendChange(e.target.value as TtsBackend)}
       >
-        {(Object.keys(TTS_BACKEND_LABELS) as TtsBackend[]).map((id) => (
+        {TTS_BACKEND_IDS.map((id) => (
           <option key={id} value={id}>
-            {TTS_BACKEND_LABELS[id]}
+            {t(`ttsBackends.${id}`)}
           </option>
         ))}
       </Select>
 
       {f.ttsBackend === "qwen" && f.ttsMeta && (
         <RepoSelect
-          label="Qwen3-TTS model"
+          label={t("advancedSettings.qwenTtsModel")}
           value={f.ttsModel}
           onChange={f.handleTtsModelChange}
           options={f.ttsMeta.qwen_models}
@@ -145,15 +181,15 @@ function VoiceDubbingFields() {
 
       {f.showCloneUi && !f.isVoiceClone && (
         <div>
-          <p className="mb-1.5 text-sm font-medium text-zinc-400">Voice source</p>
+          <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.voiceSource")}</p>
           <SegmentedControl
             value={f.voiceMode}
             onChange={f.setVoiceMode}
             options={[
-              { value: "clone_video" as const, label: "From video" },
-              { value: "clone_upload" as const, label: "Upload ref" },
+              { value: "clone_video" as const, label: t("advancedSettings.fromVideo") },
+              { value: "clone_upload" as const, label: t("advancedSettings.uploadRef") },
               ...(f.backendInfo?.supports_preset
-                ? [{ value: "preset" as const, label: "Preset" }]
+                ? [{ value: "preset" as const, label: t("advancedSettings.preset") }]
                 : []),
             ]}
           />
@@ -162,20 +198,20 @@ function VoiceDubbingFields() {
 
       {f.isVoiceClone && (
         <div>
-          <p className="mb-1.5 text-sm font-medium text-zinc-400">Voice source</p>
+          <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.voiceSource")}</p>
           <SegmentedControl
             value={f.voiceMode}
             onChange={f.setVoiceMode}
             options={[
-              { value: "clone_video" as const, label: "From video" },
-              { value: "clone_upload" as const, label: "Upload ref" },
+              { value: "clone_video" as const, label: t("advancedSettings.fromVideo") },
+              { value: "clone_upload" as const, label: t("advancedSettings.uploadRef") },
             ]}
           />
         </div>
       )}
 
       {f.showPresetUi && f.presetVoices.length > 0 && f.voiceMode === "preset" && (
-        <Select label="Preset voice" value={f.voiceId} onChange={(e) => f.setVoiceId(e.target.value)}>
+        <Select label={t("advancedSettings.presetVoice")} value={f.voiceId} onChange={(e) => f.setVoiceId(e.target.value)}>
           {f.presetVoices.map((v) => (
             <option key={v.id} value={v.id}>
               {v.label}
@@ -186,23 +222,23 @@ function VoiceDubbingFields() {
 
       {f.isVoiceDesign && (
         <div>
-          <p className="mb-1.5 text-sm font-medium text-zinc-400">Voice description (required)</p>
+          <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.voiceDescriptionRequired")}</p>
           <Textarea
             value={f.voiceDesignInstruct}
             onChange={(e) => f.setVoiceDesignInstruct(e.target.value)}
             rows={3}
-            placeholder="Describe the target voice in natural language…"
+            placeholder={t("advancedSettings.voiceDescriptionPlaceholder")}
           />
         </div>
       )}
 
       {f.ttsBackend === "qwen" && f.qwenKind === "custom_voice" && f.voiceMode === "preset" && (
         <div>
-          <p className="mb-1.5 text-sm font-medium text-zinc-400">Style instruct (optional)</p>
+          <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.styleInstructOptional")}</p>
           <Input
             value={f.voiceInstruct}
             onChange={(e) => f.setVoiceInstruct(e.target.value)}
-            placeholder="e.g. speak cheerfully"
+            placeholder={t("advancedSettings.styleInstructPlaceholder")}
           />
         </div>
       )}
@@ -210,12 +246,12 @@ function VoiceDubbingFields() {
       {f.ttsBackend === "voxcpm" && f.voiceMode === "preset" && (
         <div>
           <p className="mb-1.5 text-sm font-medium text-zinc-400">
-            Voice design description (optional)
+            {t("advancedSettings.voiceDesignDescriptionOptional")}
           </p>
           <Input
             value={f.voiceDesignInstruct}
             onChange={(e) => f.setVoiceDesignInstruct(e.target.value)}
-            placeholder="e.g. A young woman, gentle and sweet voice"
+            placeholder={t("advancedSettings.voiceDesignDescriptionPlaceholder")}
           />
         </div>
       )}
@@ -223,7 +259,7 @@ function VoiceDubbingFields() {
       {f.voiceMode === "clone_upload" && (
         <>
           <div>
-            <p className="mb-1.5 text-sm font-medium text-zinc-400">Reference audio</p>
+            <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.referenceAudio")}</p>
             <FileInput
               type="file"
               accept="audio/*"
@@ -232,12 +268,12 @@ function VoiceDubbingFields() {
           </div>
           {!f.voiceCloneXVectorOnly && (
             <div>
-              <p className="mb-1.5 text-sm font-medium text-zinc-400">Reference transcript (required)</p>
+              <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.referenceTranscriptRequired")}</p>
               <Textarea
                 value={f.refText}
                 onChange={(e) => f.setRefText(e.target.value)}
                 rows={2}
-                placeholder="Exact words spoken in the reference clip"
+                placeholder={t("advancedSettings.referenceTranscriptPlaceholder")}
               />
             </div>
           )}
@@ -251,13 +287,13 @@ function VoiceDubbingFields() {
           f.ttsBackend === "voxcpm") && (
           <div>
             <p className="mb-1.5 text-sm font-medium text-zinc-400">
-              Reference transcript override (optional)
+              {t("advancedSettings.referenceTranscriptOverride")}
             </p>
             <Textarea
               value={f.refText}
               onChange={(e) => f.setRefText(e.target.value)}
               rows={2}
-              placeholder="Leave empty to auto-detect from ASR"
+              placeholder={t("advancedSettings.referenceTranscriptOverridePlaceholder")}
             />
           </div>
         )}
@@ -270,19 +306,15 @@ function VoiceDubbingFields() {
             onChange={(e) => f.setVoiceCloneXVectorOnly(e.target.checked)}
             className="h-4 w-4 accent-zinc-400"
           />
-          <span className="text-sm text-zinc-300">
-            x_vector_only Mode (no ref transcript; lower clone quality)
-          </span>
+          <span className="text-sm text-zinc-300">{t("advancedSettings.xVectorOnlyMode")}</span>
         </label>
       )}
 
       {f.ttsBackend === "higgs" && (
         <div>
-          <p className="mb-1.5 text-sm font-medium text-zinc-400">Higgs TTS Server URL</p>
+          <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.higgsServerUrl")}</p>
           <Input value={f.higgsServerUrl} onChange={(e) => f.setHiggsServerUrl(e.target.value)} />
-          <p className="mt-1 text-xs text-zinc-500">
-            Run SGLang-Omni or vLLM-Omni locally. Research/non-commercial license.
-          </p>
+          <p className="mt-1 text-xs text-zinc-500">{t("advancedSettings.higgsServerHint")}</p>
         </div>
       )}
 
@@ -293,13 +325,13 @@ function VoiceDubbingFields() {
           onChange={(e) => f.setKeepBackground(e.target.checked)}
           className="h-4 w-4 rounded accent-indigo-500"
         />
-        <span className="text-sm text-zinc-300">Keep background music (Demucs separation)</span>
+        <span className="text-sm text-zinc-300">{t("advancedSettings.keepBackground")}</span>
       </label>
 
       {f.keepBackground && (
         <label className="block">
           <div className="mb-1 flex justify-between text-xs">
-            <span className="text-zinc-400">Background audio level</span>
+            <span className="text-zinc-400">{t("advancedSettings.backgroundAudioLevel")}</span>
             <span className="font-mono text-zinc-500">{Math.round(f.backgroundMixLevel * 100)}%</span>
           </div>
           <input
@@ -317,12 +349,13 @@ function VoiceDubbingFields() {
 }
 
 function AsrFields() {
+  const { t } = useTranslation();
   const f = useJobForm();
 
   return (
     <div className="space-y-4">
       <div>
-        <p className="mb-1.5 text-sm font-medium text-zinc-400">ASR Engine</p>
+        <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.asrEngine")}</p>
         <SegmentedControl
           value={f.asrEngine}
           onChange={f.setAsrEngine}
@@ -336,9 +369,9 @@ function AsrFields() {
 
       {f.asrEngine === "qwen" && (
         <div className="grid grid-cols-1 gap-4">
-          <RepoSelect label="ASR model" value={f.asrModel} onChange={f.setAsrModel} options={f.asrModels} />
+          <RepoSelect label={t("advancedSettings.asrModel")} value={f.asrModel} onChange={f.setAsrModel} options={f.asrModels} />
           <RepoSelect
-            label="Forced Aligner"
+            label={t("advancedSettings.forcedAligner")}
             value={f.forcedAlignerModel}
             onChange={f.setForcedAlignerModel}
             options={f.alignerModels}
@@ -349,7 +382,7 @@ function AsrFields() {
       {f.asrEngine === "whisper" && (
         <div className="space-y-3">
           <Select
-            label="Whisper Model"
+            label={t("advancedSettings.whisperModel")}
             value={f.whisperPreset}
             onChange={(e) => f.setWhisperPreset(e.target.value)}
           >
@@ -358,13 +391,13 @@ function AsrFields() {
                 {opt.label}
               </option>
             ))}
-            <option value={CUSTOM_WHISPER_VALUE}>Custom HF model…</option>
+            <option value={CUSTOM_WHISPER_VALUE}>{t("advancedSettings.customHfModel")}</option>
           </Select>
           {f.whisperPreset === CUSTOM_WHISPER_VALUE && (
             <Input
               value={f.whisperCustom}
               onChange={(e) => f.setWhisperCustom(e.target.value)}
-              placeholder="e.g. openai/whisper-large-v3-turbo"
+              placeholder={t("advancedSettings.whisperCustomPlaceholder")}
             />
           )}
         </div>
@@ -373,16 +406,13 @@ function AsrFields() {
       {f.asrEngine === "nemotron" && (
         <div className="space-y-3">
           <RepoSelect
-            label="Nemotron Model"
+            label={t("advancedSettings.nemotronModel")}
             value={f.nemotronModel}
             onChange={f.setNemotronModel}
             options={f.nemotronModels}
           />
           {f.nemotronInfo?.tier === "adaptation" && (
-            <p className="text-xs text-amber-500/80">
-              This language is adaptation-ready in Nemotron — accuracy may be lower unless
-              fine-tuned on in-domain data.
-            </p>
+            <p className="text-xs text-amber-500/80">{t("advancedSettings.nemotronAdaptationWarning")}</p>
           )}
         </div>
       )}
@@ -391,29 +421,30 @@ function AsrFields() {
 }
 
 function TranslationFields() {
+  const { t } = useTranslation();
   const f = useJobForm();
 
   return (
     <div className="space-y-4">
       <Select
-        label="Translation Engine"
+        label={t("advancedSettings.translationEngine")}
         value={f.translatorBackend}
         onChange={(e) => f.setTranslatorBackend(e.target.value)}
       >
         {TRANSLATION_BACKENDS.map((b) => (
           <option key={b.id} value={b.id}>
-            {b.label}
+            {t(`translationBackends.${b.id}`)}
           </option>
         ))}
       </Select>
 
       {f.translatorBackend === "nllb" && (
-        <RepoSelect label="NLLB Model" value={f.nllbModel} onChange={f.setNllbModel} options={f.nllbModels} />
+        <RepoSelect label={t("advancedSettings.nllbModel")} value={f.nllbModel} onChange={f.setNllbModel} options={f.nllbModels} />
       )}
 
       {f.translatorBackend === "hunyuan" && (
         <RepoSelect
-          label="Hunyuan Model"
+          label={t("advancedSettings.hunyuanModel")}
           value={f.hunyuanModel}
           onChange={f.setHunyuanModel}
           options={f.hunyuanModels}
@@ -421,7 +452,7 @@ function TranslationFields() {
       )}
 
       <div>
-        <p className="mb-1.5 text-sm font-medium text-zinc-400">Translation Batch Size</p>
+        <p className="mb-1.5 text-sm font-medium text-zinc-400">{t("advancedSettings.translationBatchSize")}</p>
         <Input
           type="number"
           min={1}
@@ -437,6 +468,7 @@ function TranslationFields() {
 }
 
 function QualityControlFields() {
+  const { t } = useTranslation();
   const f = useJobForm();
 
   return (
@@ -448,32 +480,32 @@ function QualityControlFields() {
           onChange={(e) => f.setQcEnabled(e.target.checked)}
           className="h-4 w-4 rounded accent-indigo-500"
         />
-        <span className="text-sm font-medium text-zinc-200">
-          Enable Quality Control (Back-translate + Local LLM)
-        </span>
+        <span className="text-sm font-medium text-zinc-200">{t("advancedSettings.enableQc")}</span>
       </label>
       {f.qcEnabled && (
         <div className="space-y-3">
           <Select
-            label="LLM Provider"
+            label={t("advancedSettings.llmProvider")}
             value={f.llmProvider}
             onChange={(e) => f.handleLlmProviderChange(e.target.value as LlmProvider)}
           >
             {(Object.keys(LLM_PROVIDER_PRESETS) as LlmProvider[]).map((id) => (
               <option key={id} value={id}>
-                {LLM_PROVIDER_PRESETS[id].label}
+                {t(`llmProviders.${id}`)}
               </option>
             ))}
           </Select>
           <Input
             value={f.llmBaseUrl}
             onChange={(e) => f.setLlmBaseUrl(e.target.value)}
-            placeholder={`${LLM_PROVIDER_PRESETS[f.llmProvider].label} base URL`}
+            placeholder={t("advancedSettings.llmBaseUrlPlaceholder", {
+              provider: t(`llmProviders.${f.llmProvider}`),
+            })}
           />
           <Input
             value={f.llmModel}
             onChange={(e) => f.setLlmModel(e.target.value)}
-            placeholder="Model name"
+            placeholder={t("advancedSettings.modelNamePlaceholder")}
           />
         </div>
       )}

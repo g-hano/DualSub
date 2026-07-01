@@ -1,14 +1,11 @@
+import { useTranslation } from "react-i18next";
+
 type Step = "configure" | "processing" | "preview" | "export";
 
-const STEPS: { id: Step; label: string }[] = [
-  { id: "configure", label: "Configure" },
-  { id: "processing", label: "Processing" },
-  { id: "preview", label: "Preview" },
-  { id: "export", label: "Export" },
-];
+const STEP_IDS: Step[] = ["configure", "processing", "preview", "export"];
 
 function stepIndex(step: Step): number {
-  return STEPS.findIndex((s) => s.id === step);
+  return STEP_IDS.indexOf(step);
 }
 
 export default function WorkflowStepper({
@@ -18,15 +15,16 @@ export default function WorkflowStepper({
   current: Step;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const currentIdx = stepIndex(current);
 
   return (
-    <nav aria-label="Workflow progress" className={`flex min-w-0 items-center gap-0 ${className}`}>
-      {STEPS.map((step, i) => {
+    <nav aria-label={t("workflow.ariaLabel")} className={`flex min-w-0 items-center gap-0 ${className}`}>
+      {STEP_IDS.map((stepId, i) => {
         const done = i < currentIdx;
         const active = i === currentIdx;
         return (
-          <div key={step.id} className="flex flex-1 items-center">
+          <div key={stepId} className="flex flex-1 items-center">
             <div className="flex items-center gap-2.5">
               <span
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
@@ -50,10 +48,10 @@ export default function WorkflowStepper({
                   active ? "text-zinc-100" : done ? "text-zinc-400" : "text-zinc-600"
                 }`}
               >
-                {step.label}
+                {t(`workflow.${stepId}`)}
               </span>
             </div>
-            {i < STEPS.length - 1 && (
+            {i < STEP_IDS.length - 1 && (
               <div
                 className={`mx-3 h-px flex-1 transition-colors ${
                   i < currentIdx ? "bg-indigo-500/50" : "bg-zinc-800"

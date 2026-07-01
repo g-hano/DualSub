@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import Button from "./ui/Button";
 import FileDropZone from "./ui/FileDropZone";
 import FormSection from "./ui/FormSection";
@@ -9,6 +10,7 @@ import SegmentedControl from "./ui/SegmentedControl";
 import { useJobForm } from "../hooks/useJobForm";
 
 export default function JobForm() {
+  const { t } = useTranslation();
   const f = useJobForm();
 
   return (
@@ -18,26 +20,26 @@ export default function JobForm() {
           selected={f.jobMode === "subtitle"}
           onClick={() => f.setJobMode("subtitle")}
           icon={<IconSubtitles className="h-5 w-5" />}
-          title="Subtitles"
-          description="Dual-language subtitles with karaoke highlighting"
+          title={t("jobForm.subtitles")}
+          description={t("jobForm.subtitlesDesc")}
         />
         <ModeCard
           selected={f.jobMode === "dub"}
           onClick={() => f.setJobMode("dub")}
           icon={<IconDub className="h-5 w-5" />}
-          title="Dubbing"
-          description="Replace speech with synthesized voice"
+          title={t("jobForm.dubbing")}
+          description={t("jobForm.dubbingDesc")}
         />
       </div>
 
-      <FormSection step={1} title="Media Source" description="YouTube link or local file">
+      <FormSection step={1} title={t("jobForm.mediaSource")} description={t("jobForm.mediaSourceDesc")}>
         <SegmentedControl
           value={f.mode}
           onChange={f.setMode}
           size="sm"
           options={[
-            { value: "url" as const, label: "URL", icon: <IconLink className="h-3.5 w-3.5" /> },
-            { value: "file" as const, label: "Upload", icon: <IconUpload className="h-3.5 w-3.5" /> },
+            { value: "url" as const, label: t("common.url"), icon: <IconLink className="h-3.5 w-3.5" /> },
+            { value: "file" as const, label: t("common.upload"), icon: <IconUpload className="h-3.5 w-3.5" /> },
           ]}
         />
         <div className="mt-3">
@@ -46,7 +48,7 @@ export default function JobForm() {
               type="url"
               value={f.sourceUrl}
               onChange={(e) => f.setSourceUrl(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
+              placeholder={t("jobForm.urlPlaceholder")}
             />
           ) : (
             <FileDropZone accept="video/*,audio/*" file={f.file} onFile={f.setFile} />
@@ -54,10 +56,10 @@ export default function JobForm() {
         </div>
       </FormSection>
 
-      <FormSection step={2} title="Languages" description="Spoken language and Translation target">
+      <FormSection step={2} title={t("jobForm.languages")} description={t("jobForm.languagesDesc")}>
         <div className="flex items-end gap-2">
           <div className="flex-1">
-            <Select label="From" value={f.sourceLang} onChange={(e) => f.setSourceLang(e.target.value)}>
+            <Select label={t("common.from")} value={f.sourceLang} onChange={(e) => f.setSourceLang(e.target.value)}>
               {f.sortedLanguages.map(([code, name]) => (
                 <option key={code} value={code}>
                   {name}
@@ -69,7 +71,7 @@ export default function JobForm() {
             <IconArrowRight className="h-4 w-4" />
           </span>
           <div className="flex-1">
-            <Select label="To" value={f.targetLang} onChange={(e) => f.setTargetLang(e.target.value)}>
+            <Select label={t("common.to")} value={f.targetLang} onChange={(e) => f.setTargetLang(e.target.value)}>
               {f.sortedLanguages.map(([code, name]) => (
                 <option key={code} value={code}>
                   {name}
@@ -89,10 +91,10 @@ export default function JobForm() {
         icon={<IconPlay className="h-4 w-4" />}
       >
         {f.busy
-          ? "Processing..."
+          ? t("jobForm.processing")
           : f.jobMode === "dub"
-            ? "Generate Dubbed Video"
-            : "Generate Subtitles"}
+            ? t("jobForm.generateDub")
+            : t("jobForm.generateSubtitles")}
       </Button>
     </form>
   );

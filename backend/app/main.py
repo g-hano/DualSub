@@ -435,27 +435,48 @@ async def create_job(
     return {"job_id": job.id, "status": job.status.value}
 
 
-@app.get("/api/jobs/{job_id}")
-def get_job(job_id: str) -> dict:
-    job = manager.get_job(job_id)
-    if not job:
-        raise HTTPException(404, "Job not found")
-    return {
+def _job_to_dict(job, *, include_cues: bool = False) -> dict:
+    payload = {
         "job_id": job.id,
         "status": job.status.value,
         "progress": job.progress,
         "message": job.message,
         "error": job.error,
+        "source_url": job.source_url,
         "media_filename": job.media_filename,
         "export_filename": job.export_filename,
         "dub_filename": job.dub_filename,
         "config": job.config.model_dump(),
     }
+    if include_cues:
+        cues = job.cues or manager.load_cues(job.id)
+        payload["cues"] = [c.model_dump() for c in cues]
+    return payload
+
+
+@app.get("/api/jobs")
+def list_jobs() -> dict:
+    return {"jobs": manager.list_jobs()}
+
+
+@app.get("/api/jobs/{job_id}")
+def get_job(job_id: str, include_cues: bool = False) -> dict:
+    job = manager.get_or_load_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return _job_to_dict(job, include_cues=include_cues)
+
+
+@app.delete("/api/jobs/{job_id}")
+def delete_job(job_id: str) -> dict:
+    if not manager.delete_job(job_id):
+        raise HTTPException(404, "Job not found")
+    return {"deleted": True, "job_id": job_id}
 
 
 @app.get("/api/jobs/{job_id}/cues")
 def get_cues(job_id: str) -> JSONResponse:
-    job = manager.get_job(job_id)
+    job = manager.get_or_load_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     cues = manager.load_cues(job_id)
@@ -464,7 +485,7 @@ def get_cues(job_id: str) -> JSONResponse:
 
 @app.get("/api/jobs/{job_id}/media")
 def get_media(job_id: str):
-    job = manager.get_job(job_id)
+    job = manager.get_or_load_job(job_id)
     if not job or not job.media_filename:
         raise HTTPException(404, "Media not found")
     path = manager.media_path(job)
@@ -480,7 +501,7 @@ class ExportJobRequest(BaseModel):
 
 @app.post("/api/jobs/{job_id}/export")
 def export_job(job_id: str, body: Optional[ExportJobRequest] = None) -> dict:
-    job = manager.get_job(job_id)
+    job = manager.get_or_load_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     style_override = None
@@ -502,7 +523,7 @@ def export_job(job_id: str, body: Optional[ExportJobRequest] = None) -> dict:
 
 @app.get("/api/jobs/{job_id}/export")
 def download_export(job_id: str):
-    job = manager.get_job(job_id)
+    job = manager.get_or_load_job(job_id)
     if not job or not job.export_filename:
         raise HTTPException(404, "No export available")
     path = manager.job_dir(job_id) / job.export_filename
@@ -514,7 +535,7 @@ def download_export(job_id: str):
 @app.websocket("/api/jobs/{job_id}/progress")
 async def progress_ws(websocket: WebSocket, job_id: str) -> None:
     await websocket.accept()
-    job = manager.get_job(job_id)
+    job = manager.get_or_load_job(job_id)
     if not job:
         await websocket.close(code=1008)
         return

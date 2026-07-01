@@ -10,7 +10,8 @@ import threading
 import traceback
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from urllib.parse import unquote, urlparse
 
 from .config import PipelineConfig, is_qwen_voice_clone_model, settings
 from .models import Cue, Job, JobStatus
@@ -55,6 +56,70 @@ class JobManager:
 
     def get_job(self, job_id: str) -> Optional[Job]:
         return self._jobs.get(job_id)
+
+    def get_or_load_job(self, job_id: str) -> Optional[Job]:
+        job = self.get_job(job_id)
+        if job is not None:
+            return job
+        return self.load_job_from_disk(job_id)
+
+    def load_job_from_disk(self, job_id: str) -> Optional[Job]:
+        path = self.job_dir(job_id) / "job.json"
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            job = Job.model_validate(data)
+            if not job.cues:
+                job.cues = self._load_cues_from_disk(job_id)
+            with self._lock:
+                self._jobs[job_id] = job
+                self._subscribers.setdefault(job_id, [])
+            return job
+        except Exception:
+            logger.exception("[job %s] failed to load from disk", job_id)
+            return None
+
+    def list_jobs(self) -> List[Dict[str, Any]]:
+        jobs_dir = settings.jobs_dir
+        if not jobs_dir.exists():
+            return []
+        results: List[Dict[str, Any]] = []
+        for entry in jobs_dir.iterdir():
+            if not entry.is_dir():
+                continue
+            job_json = entry / "job.json"
+            if not job_json.exists():
+                continue
+            try:
+                data = json.loads(job_json.read_text(encoding="utf-8"))
+                job_id = data.get("id") or entry.name
+                config = data.get("config") or {}
+                results.append(
+                    {
+                        "id": job_id,
+                        "status": data.get("status", JobStatus.pending.value),
+                        "created_at": job_json.stat().st_mtime,
+                        "source_url": data.get("source_url"),
+                        "media_filename": data.get("media_filename"),
+                        "mode": config.get("job_mode", "subtitle"),
+                        "label": _job_label(data),
+                    }
+                )
+            except Exception:
+                logger.exception("[job %s] skipped in list_jobs", entry.name)
+        results.sort(key=lambda item: item["created_at"], reverse=True)
+        return results
+
+    def delete_job(self, job_id: str) -> bool:
+        job_dir = self.job_dir(job_id)
+        if not job_dir.exists():
+            return False
+        with self._lock:
+            self._jobs.pop(job_id, None)
+            self._subscribers.pop(job_id, None)
+        shutil.rmtree(job_dir)
+        return True
 
     def job_dir(self, job_id: str) -> Path:
         return settings.jobs_dir / job_id
@@ -287,15 +352,32 @@ class JobManager:
         self._persist(job)
         return out
 
-    def load_cues(self, job_id: str) -> List[Cue]:
-        job = self.get_job(job_id)
-        if job and job.cues:
-            return job.cues
+    def _load_cues_from_disk(self, job_id: str) -> List[Cue]:
         path = self.job_dir(job_id) / "cues.json"
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
             return [Cue(**c) for c in data]
         return []
+
+    def load_cues(self, job_id: str) -> List[Cue]:
+        job = self.get_job(job_id)
+        if job and job.cues:
+            return job.cues
+        return self._load_cues_from_disk(job_id)
+
+
+def _job_label(data: dict) -> str:
+    media = data.get("media_filename")
+    if media:
+        return Path(str(media)).stem or str(media)
+    url = data.get("source_url") or ""
+    if url:
+        path = urlparse(url).path
+        name = Path(unquote(path)).name
+        if name:
+            return Path(name).stem or name
+        return url if len(url) <= 48 else f"{url[:45]}…"
+    return str(data.get("id") or "Untitled")
 
 
 manager = JobManager()

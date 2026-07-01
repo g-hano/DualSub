@@ -1,13 +1,14 @@
+import { useTranslation } from "react-i18next";
 import type { SubtitleStyleSettings, TrackStyle } from "../types";
 import Accordion from "./ui/Accordion";
 import Select from "./ui/Select";
 import Input from "./ui/Input";
 
-const TIER_LABEL: Record<string, string> = {
-  ready: "Transcription-ready",
-  broad: "Broad-coverage",
-  adaptation: "Adaptation-ready",
-};
+const TIER_KEYS = {
+  ready: "subtitle.tierReady",
+  broad: "subtitle.tierBroad",
+  adaptation: "subtitle.tierAdaptation",
+} as const;
 
 export default function SubtitleSettingsPanel({
   settings,
@@ -15,8 +16,8 @@ export default function SubtitleSettingsPanel({
   onSourceChange,
   onTargetChange,
   onReset,
-  sourceLabel = "Spoken language",
-  targetLabel = "Translation",
+  sourceLabel,
+  targetLabel,
   embedded = false,
 }: {
   settings: SubtitleStyleSettings;
@@ -28,34 +29,36 @@ export default function SubtitleSettingsPanel({
   targetLabel?: string;
   embedded?: boolean;
 }) {
+  const { t } = useTranslation();
+  const resolvedSourceLabel = sourceLabel ?? t("subtitle.spokenLanguage");
+  const resolvedTargetLabel = targetLabel ?? t("app.translation");
+
   return (
     <div className={embedded ? "" : "rounded-lg border border-border bg-surface p-4"}>
       <div className="mb-3 flex items-center justify-between gap-3">
         {!embedded && (
-          <h3 className="text-sm font-medium text-zinc-200">Subtitle appearance</h3>
+          <h3 className="text-sm font-medium text-zinc-200">{t("subtitle.appearance")}</h3>
         )}
         {embedded && (
-          <p className="text-xs text-accent-muted">
-            Adjust on-screen preview and export styling. Export uses system fonts.
-          </p>
+          <p className="text-xs text-accent-muted">{t("subtitle.embeddedHint")}</p>
         )}
         <button
           type="button"
           onClick={onReset}
           className="ml-auto shrink-0 text-xs text-zinc-500 transition hover:text-zinc-300"
         >
-          Reset
+          {t("common.reset")}
         </button>
       </div>
       <div className="space-y-3">
         <TrackEditor
-          label={sourceLabel}
+          label={resolvedSourceLabel}
           track={settings.source}
           fonts={fonts}
           onChange={onSourceChange}
         />
         <TrackEditor
-          label={targetLabel}
+          label={resolvedTargetLabel}
           track={settings.target}
           fonts={fonts}
           onChange={onTargetChange}
@@ -76,6 +79,8 @@ function TrackEditor({
   fonts: string[];
   onChange: (patch: Partial<TrackStyle>) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Accordion
       title={label}
@@ -85,7 +90,7 @@ function TrackEditor({
     >
       <div className="space-y-3">
         <Select
-          label="Font"
+          label={t("common.font")}
           value={track.font_family}
           onChange={(e) => onChange({ font_family: e.target.value })}
         >
@@ -98,7 +103,7 @@ function TrackEditor({
 
         <label className="block">
           <div className="mb-1 flex justify-between text-xs">
-            <span className="text-accent-muted">Size</span>
+            <span className="text-accent-muted">{t("common.size")}</span>
             <span className="font-mono text-zinc-500">{track.font_size}px</span>
           </div>
           <input
@@ -113,19 +118,19 @@ function TrackEditor({
         </label>
 
         <div className="grid grid-cols-2 gap-3">
-          <ColorField label="Text color" value={track.color} onChange={(c) => onChange({ color: c })} />
+          <ColorField label={t("subtitle.textColor")} value={track.color} onChange={(c) => onChange({ color: c })} />
           <ColorField
-            label="Karaoke active"
+            label={t("subtitle.karaokeActive")}
             value={track.karaoke_active_color}
             onChange={(c) => onChange({ karaoke_active_color: c })}
           />
           <ColorField
-            label="Karaoke done"
+            label={t("subtitle.karaokeDone")}
             value={track.karaoke_done_color}
             onChange={(c) => onChange({ karaoke_done_color: c })}
           />
           <label className="block text-xs">
-            <span className="text-accent-muted">Background</span>
+            <span className="text-accent-muted">{t("subtitle.background")}</span>
             <input
               type="range"
               min={0}
@@ -145,7 +150,7 @@ function TrackEditor({
               onChange={(e) => onChange({ bold: e.target.checked })}
               className="accent-zinc-400"
             />
-            Bold
+            {t("common.bold")}
           </label>
           <label className="flex cursor-pointer items-center gap-2 text-zinc-400">
             <input
@@ -154,7 +159,7 @@ function TrackEditor({
               onChange={(e) => onChange({ italic: e.target.checked })}
               className="accent-zinc-400"
             />
-            Italic
+            {t("common.italic")}
           </label>
         </div>
 
@@ -170,7 +175,7 @@ function TrackEditor({
           }}
           aria-hidden
         >
-          Sample — {label}
+          {t("common.sample", { label })}
         </p>
       </div>
     </Accordion>
@@ -207,4 +212,4 @@ function ColorField({
   );
 }
 
-export { TIER_LABEL };
+export { TIER_KEYS as TIER_LABEL };

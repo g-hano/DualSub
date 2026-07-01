@@ -1,4 +1,5 @@
 import { useRef, useState, type DragEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { IconUpload } from "./Icons";
 
 export default function FileDropZone({
@@ -10,6 +11,7 @@ export default function FileDropZone({
   file: File | null;
   onFile: (file: File | null) => void;
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -54,13 +56,13 @@ export default function FileDropZone({
         <>
           <p className="text-sm font-medium text-zinc-200">{file.name}</p>
           <p className="mt-1 text-xs text-zinc-500">
-            {(file.size / 1024 / 1024).toFixed(1)} MB — click to change
+            {t("fileDrop.clickToChange", { size: (file.size / 1024 / 1024).toFixed(1) })}
           </p>
         </>
       ) : (
         <>
-          <p className="text-sm font-medium text-zinc-300">Drop Video or Audio Here</p>
-          <p className="mt-1 text-xs text-zinc-500">or click to browse files</p>
+          <p className="text-sm font-medium text-zinc-300">{t("fileDrop.dropHere")}</p>
+          <p className="mt-1 text-xs text-zinc-500">{t("fileDrop.browse")}</p>
         </>
       )}
     </div>

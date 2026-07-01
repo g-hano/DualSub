@@ -3,7 +3,8 @@ import type { SubtitleStyleSettings, TrackStyle } from "../types";
 
 export type { SubtitleStyleSettings, TrackStyle };
 
-const STORAGE_KEY = "subtitle-style-settings-v2";
+const STORAGE_PREFIX = "subtitle-style-settings-v2";
+const LEGACY_GLOBAL_KEY = "subtitle-style-settings-v2";
 const LEGACY_STORAGE_KEYS = ["subtitle-style-settings", "subtitle-font-settings"] as const;
 
 /** Previous factory defaults — still present in many browsers' localStorage. */
@@ -31,6 +32,10 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyleSettings = {
     background_opacity: 0.25,
   },
 };
+
+function storageKey(jobId: string | null): string {
+  return jobId ? `${STORAGE_PREFIX}-${jobId}` : `${STORAGE_PREFIX}-draft`;
+}
 
 function clampSize(n: number): number {
   return Math.min(48, Math.max(12, Math.round(n)));
@@ -97,32 +102,50 @@ function parseStoredSettings(raw: string): SubtitleStyleSettings | null {
   }
 }
 
-function loadSettings(): SubtitleStyleSettings {
-  const current = localStorage.getItem(STORAGE_KEY);
-  if (current) {
-    const parsed = parseStoredSettings(current);
+function loadSettingsForJob(jobId: string | null): SubtitleStyleSettings {
+  const key = storageKey(jobId);
+  const stored = localStorage.getItem(key);
+  if (stored) {
+    const parsed = parseStoredSettings(stored);
     if (parsed) return parsed;
   }
 
-  for (const legacyKey of LEGACY_STORAGE_KEYS) {
-    const legacy = localStorage.getItem(legacyKey);
-    if (!legacy) continue;
-    const parsed = parseStoredSettings(legacy);
-    if (parsed) {
-      localStorage.removeItem(legacyKey);
-      return parsed;
+  if (!jobId) {
+    const global = localStorage.getItem(LEGACY_GLOBAL_KEY);
+    if (global) {
+      const parsed = parseStoredSettings(global);
+      if (parsed) return parsed;
+    }
+    for (const legacyKey of LEGACY_STORAGE_KEYS) {
+      const legacy = localStorage.getItem(legacyKey);
+      if (!legacy) continue;
+      const parsed = parseStoredSettings(legacy);
+      if (parsed) {
+        localStorage.removeItem(legacyKey);
+        return parsed;
+      }
     }
   }
 
   return DEFAULT_SUBTITLE_STYLE;
 }
 
-export function useSubtitleStyleSettings() {
-  const [settings, setSettings] = useState<SubtitleStyleSettings>(loadSettings);
+function persistSettings(jobId: string | null, settings: SubtitleStyleSettings) {
+  localStorage.setItem(storageKey(jobId), JSON.stringify(settings));
+}
+
+export function useSubtitleStyleSettings(jobId: string | null = null) {
+  const [settings, setSettings] = useState<SubtitleStyleSettings>(() =>
+    loadSettingsForJob(jobId)
+  );
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  }, [settings]);
+    setSettings(loadSettingsForJob(jobId));
+  }, [jobId]);
+
+  useEffect(() => {
+    persistSettings(jobId, settings);
+  }, [settings, jobId]);
 
   const updateSource = useCallback((patch: Partial<TrackStyle>) => {
     setSettings((s) => ({
@@ -156,7 +179,19 @@ export function useSubtitleStyleSettings() {
 
   const reset = useCallback(() => setSettings(DEFAULT_SUBTITLE_STYLE), []);
 
-  return { settings, updateSource, updateTarget, reset };
+  const loadFromConfig = useCallback(
+    (style: SubtitleStyleSettings) => {
+      const next = {
+        source: normalizeTrack(style.source, DEFAULT_SUBTITLE_STYLE.source),
+        target: normalizeTrack(style.target, DEFAULT_SUBTITLE_STYLE.target),
+      };
+      setSettings(next);
+      if (jobId) persistSettings(jobId, next);
+    },
+    [jobId]
+  );
+
+  return { settings, updateSource, updateTarget, reset, loadFromConfig };
 }
 
 /** @deprecated use useSubtitleStyleSettings */
